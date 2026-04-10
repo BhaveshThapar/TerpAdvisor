@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest:*)",
+      "Bash(python -c:*)",
+      "Bash(python3 -c:*)",
+      "Bash(pip install:*)",
+      "Bash(uvicorn:*)",
+      "Bash(npm run:*)",
+      "Bash(npm install:*)",
+      "Bash(npx:*)",
+      "Bash(docker compose:*)",
+      "Bash(docker-compose:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)",
+      "Bash(ls:*)",
+      "Bash(wc:*)",
+      "Bash(mv:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git status:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git branch:*)",
+      "Read(~/.claude/plans/**)",
+      "WebFetch(domain:planetterp.com)",
+      "WebFetch(domain:api.umd.io)",
+      "WebFetch(domain:www.cs.umd.edu)",
+      "WebFetch(domain:undergrad.cs.umd.edu)",
+      "WebFetch(domain:academiccatalog.umd.edu)",
+      "WebFetch(domain:gened.umd.edu)",
+      "WebSearch"
+    ]
+  }
+}

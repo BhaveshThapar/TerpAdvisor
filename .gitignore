@@ -32,7 +32,7 @@ pgdata/
 
 # Misc
 *.log
-.claude/
+.claude/settings.local.json
 
 # Python virtualenv and local DBs
 venv/
