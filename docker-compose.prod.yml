@@ -1,0 +1,23 @@
+services:
+  backend:
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    volumes: []
+    environment:
+      DEMO_MODE: "false"
+    restart: unless-stopped
+
+  celery-worker:
+    command: celery -A app.workers.celery_app worker --loglevel=warning --uid=nobody
+    volumes: []
+    restart: unless-stopped
+
+  celery-beat:
+    command: celery -A app.workers.celery_app beat --loglevel=warning
+    volumes: []
+    restart: unless-stopped
+
+  db:
+    restart: unless-stopped
+
+  redis:
+    restart: unless-stopped

@@ -1,0 +1,638 @@
+PRODUCT REQUIREMENTS DOCUMENT
+TerpAdvisor
+Intelligent Course Recommendation Engine for UMD Students
+
+Author: Bhavesh Jain Version: 2.0  |  April 2026 Status: In Progress
+
+1. Executive Summary
+TerpAdvisor is a full-stack web application that provides personalized course recommendations to University of Maryland students. It combines a DAG-based prerequisite engine, a hybrid multi-scorer recommendation pipeline, CSP-based schedule optimization, and a three-tier cache to deliver intelligent, degree-aware course guidance.
+
+Version 2.0 of this document reflects the as-built state of the system. The backend is feature-complete through what was originally envisioned as Phase 3, including transcript upload (text and PDF), collaborative filtering, multi-semester planning, iCal export, and resilient external-API infrastructure. The frontend covers all primary user flows with a polished Next.js + Tailwind UI.
+2. Problem Statement
+Course selection at UMD remains fragmented and time-consuming. Students must cross-reference:
+Testudo for course availability and seat counts
+PlanetTerp for GPA, grade distributions, and professor reviews
+Academic catalog PDFs for degree requirement trees
+Word-of-mouth for scheduling wisdom (no 8AMs, avoid certain professors)
+
+No single tool answers: "Given what I have taken, what I need, and how I like to learn — what should I take next semester?" TerpAdvisor solves this.
+3. Target Users
+3.1 Primary Persona
+UMD undergraduates (CS, Math, Engineering) actively planning their next semester and wanting data-driven, requirement-aware recommendations.
+3.2 Secondary Personas
+Transfer students mapping remaining requirements quickly via transcript upload
+Students exploring minors or electives outside their department
+Advisors and peer mentors using it as a quick reference tool
+4. Goals & Success Metrics
+Goal
+Success Metric
+Target
+Reduce course selection time
+Avg. time from open to schedule decision
+Under 15 minutes
+Surface high-quality courses
+% of recommended courses with avg GPA ≥ 3.0
+≥ 70%
+Accurate requirement tracking
+% of requirement mapping validated against catalog
+≥ 95%
+User adoption at UMD
+Monthly active users (first semester)
+500+ MAU
+User satisfaction
+Post-use survey rating
+≥ 4.2 / 5
+5. Core Features
+5.1 Transcript Parsing & Course History Input
+Students can populate their course history via three methods:
+Manual search: autocomplete by department/code (e.g., CMSC216, MATH241) backed by the full UMD course catalog
+Transcript text paste: paste raw text from Testudo's unofficial transcript; the backend regex parser extracts all completed courses, credits, grades, and gen-ed tags automatically
+PDF upload (POST /api/courses/parse-transcript-pdf): upload an unofficial transcript PDF; the server extracts text via PyMuPDF and runs the same parser
+
+The parser handles edge cases including: repeated courses (most recent grade wins), withdrawals (W/AW/XF excluded), AP/transfer equivalency credits (mapped to UMD course IDs where possible, or stored as TR_<credits>_<name> tokens), and in-progress courses (tagged separately for corequisite checking).
+5.2 Degree Requirement Tracking & Audit
+POST /api/audit runs a full degree audit against the student's completed courses.
+Supported majors at launch:
+Major
+Tracks / Concentrations
+GenEd Support
+Computer Science B.S.
+General, Data Science, Machine Learning, Quantum Information
+Yes
+Mathematics B.S.
+General
+Yes
+Information Science B.S.
+General
+Yes
+Economics B.A.
+General
+Yes
+Biological Sciences B.S.
+General
+Yes
+Mechanical Engineering B.S.
+General
+Yes
+
+The audit result includes: overall progress %, credits completed vs. required, per-group and per-requirement status (completed / in_progress / partially_complete / not_started), remaining course options, and a list of the highest-impact courses (courses that satisfy the most remaining requirements).
+Minor support: a minor_prefix field injects department-level 300/400-level courses into the Upper-Level Coursework (ULC) requirement automatically.
+5.3 PlanetTerp & umd.io Integration
+Source
+Endpoint / Method
+Data Retrieved
+Caching
+PlanetTerp
+GET /v1/course
+Course metadata, professor list, avg GPA
+24-hr TTL in multi-layer cache
+PlanetTerp
+GET /v1/grades
+Grade distribution across all semesters (A+…F, W)
+Per-request with 24-hr TTL
+PlanetTerp
+GET /v1/professor
+Professor rating, review count
+24-hr TTL
+umd.io
+GET /v1/courses/:id
+Prerequisite text, course description
+Persisted to Postgres on first fetch
+umd.io
+GET /v1/sections
+Section meeting times, seat availability
+Nightly ETL via Celery
+
+Both integrations are wrapped in a circuit breaker (CLOSED → OPEN → HALF_OPEN state machine with sliding-window failure tracking) and a token-bucket rate limiter to stay within PlanetTerp's respectful-use guidelines.
+5.4 Smart Recommendation Engine
+POST /api/recommendations returns ranked courses with explainable scoring. The engine is built as a Strategy pattern: each scoring dimension is a pluggable Scorer implementing BaseScorer. Scores are aggregated with user-adjustable weights, then normalized to sum to 1.0.
+Scorer
+Default Weight
+Signal
+Requirement Fulfillment
+35%
+How many unmet degree requirements this course satisfies
+GPA
+25%
+Average grade from PlanetTerp grade distributions
+Professor Rating
+15%
+PlanetTerp professor avg_rating for sections being offered
+Review Sentiment
+10%
+NLTK-based positive/negative keyword analysis of student reviews
+Schedule Fit
+10%
+Absence of conflicts with already-selected sections (via interval tree)
+Students Also Took
+5%
+Co-enrollment frequency from aggregate grade data (collaborative filtering)
+Preference Tags
+~0% default
+Matches user-selected tags (project-based, no-final-exam, etc.)
+
+Each recommendation is returned with a full explanation list (factor, score, weight, contribution, human-readable text) and a top_reason sentence derived from the highest-contributing factor.
+5.5 Filter System
+Filters are applied before scoring to narrow the candidate course set:
+Filter
+Values
+departments
+One or more department codes (e.g., CMSC, MATH)
+levels
+Course level buckets: 100, 200, 300, 400
+gen_eds
+Any combination of DSNS, DSHU, DSNL, DVUP, DVCC, SCIS, etc.
+min_credits / max_credits
+Credit range filter
+min_gpa
+Minimum average GPA threshold (e.g., 3.0)
+exclude_courses
+Specific course IDs to omit from results
+5.6 CSP Schedule Builder
+POST /api/schedule/generate solves schedule construction as a Constraint Satisfaction Problem:
+Variables: one slot per requested course
+Domains: available sections for each course (from umd.io via DB)
+Constraints: no time conflicts (checked via interval tree), hard time bounds (no_before, no_after), avoided days
+
+Backtracking search with forward checking generates all feasible schedules (up to 10× the requested count), then ranks them by a 100-point preference score:
+Factor
+Points
+Time preferences (penalize early/late classes)
+30
+Day preference (MWF, TuTh, no-Friday, etc.)
+25
+Gap minimization between back-to-back classes
+20
+Daily balance (even class distribution)
+15
+Seat availability
+10
+
+POST /api/schedule/export/ical generates an iCal (.ics) file from the best schedule for direct import into Google Calendar or Apple Calendar (no account needed — just import the .ics). Events recur weekly for 16 weeks with the correct day-of-week mapping.
+5.7 Multi-Semester Graduation Planner
+POST /api/plan generates a semester-by-semester course plan to graduation. Algorithm:
+Run degree audit to identify remaining required courses
+Build a subgraph of remaining courses and topologically sort via Kahn's algorithm
+Greedily assign courses to semesters respecting credit caps, course count caps, and prerequisite ordering
+Prioritized courses (user-specified) are front-loaded into earlier semesters
+
+Returns semester labels (e.g., "Fall 2026", "Spring 2027"), course lists, credit totals, and a warnings list for courses that could not be scheduled due to unresolvable prerequisites.
+5.8 Course Detail View
+GET /api/courses/:id returns a rich course detail payload:
+Course description (from umd.io, backfilled and persisted on first request)
+Average GPA and full grade distribution by letter grade (live from PlanetTerp)
+Student reviews with rating and text
+Professor list with ratings and review counts (from DB + PlanetTerp fallback)
+Prerequisites with completion status relative to a passed completed= query param
+Which degree requirement(s) in each supported major this course fulfills
+Section meeting times, days, seat availability
+5.9 Cart & Wishlist
+Two lightweight persistence features:
+Cart (POST/GET/DELETE /api/cart): courses the student intends to register for this semester. Used as the "selected_sections" input to the schedule solver for conflict detection.
+Wishlist (POST/GET/DELETE /api/wishlist): saved courses for future semesters or further review.
+6. System Architecture
+6.1 Tech Stack
+Layer
+Technology
+Rationale
+Frontend
+Next.js 14 (App Router) + Tailwind CSS
+SSR, RSC, fast iteration, component reuse
+Backend API
+Python 3.13 + FastAPI (async)
+Async I/O for concurrent API calls, clean dependency injection
+Database
+PostgreSQL (prod) / SQLite (dev via Alembic)
+Relational model for courses, requirements, user profiles
+Cache Layer 1
+In-process TTL-LRU (OrderedDict)
+Sub-millisecond reads for hot keys, zero network hop
+Cache Layer 2
+Redis
+Shared cache across workers, 24-hr TTL for PlanetTerp data
+Cache Layer 3
+PostgreSQL cache_entries table
+Durable fallback; survives Redis restarts
+Auth
+Browser localStorage (no account required)
+Zero-friction: no sign-in required; all data persists in localStorage
+Background Jobs
+Celery + Celery Beat
+Nightly full sync, hourly delta sync, cache warming
+Message Broker
+Redis (Celery broker)
+Same Redis instance as cache
+PDF Extraction
+PyMuPDF (fitz)
+Transcript PDF text extraction
+Sentiment Analysis
+NLTK
+Review keyword scoring for sentiment scorer
+Containerization
+Docker + docker-compose
+Postgres, Redis, backend, Celery worker/beat
+Hosting (planned)
+Vercel (frontend) + Railway/Render (backend)
+Free-tier friendly, easy deploy
+6.2 Backend Module Map
+Module
+Path
+Responsibility
+API routers
+app/api/
+courses, recommendations, schedule, professors, auth, cart, wishlist, user
+Recommendation engine
+app/engine/recommender.py
+Scorer orchestration, weight normalization, explanation generation
+Scorers
+app/engine/scorers/
+requirement, gpa, professor, sentiment, collaborative, schedule_fit, preference_tags
+DAG engine
+app/engine/course_graph.py
+Kahn's topo sort, cycle detection, reachability, path finding
+Degree auditor
+app/engine/degree_audit.py
+Requirement trees, audit result, highest-impact courses
+Schedule solver
+app/engine/schedule_solver.py
+CSP backtracking, forward checking, preference scoring
+Interval tree
+app/engine/interval_tree.py
+O(log n) time-conflict detection for schedule building
+Planner
+app/engine/planner.py
+Multi-semester graduation plan generator
+Multi-layer cache
+app/cache/multi_layer.py
+LRU → Redis → Postgres with invalidation and stampede prevention
+Circuit breaker
+app/integrations/circuit_breaker.py
+CLOSED/OPEN/HALF_OPEN with sliding-window failure tracking
+Rate limiter
+app/integrations/rate_limiter.py
+Token-bucket rate limiter for external API calls
+PlanetTerp client
+app/integrations/planetterp.py
+Resilient PlanetTerp API wrapper
+umd.io client
+app/integrations/umd_io.py
+Resilient umd.io API wrapper
+Event bus
+app/events/publisher.py
+In-process pub/sub for cache invalidation on ETL updates
+Celery tasks
+app/workers/tasks.py
+full_sync (nightly), delta_sync (hourly), warm_cache, sync_course
+ETL
+app/workers/etl/
+planetterp_etl.py, umdio_etl.py — bulk and incremental data sync
+6.3 Frontend Pages & Components
+Route
+Component
+Purpose
+/
+page.tsx
+Landing / home page
+/login
+layout.tsx
+No login (localStorage)
+/onboarding
+onboarding/page.tsx
+Major selection + initial course history input
+/dashboard
+dashboard/page.tsx
+Degree progress overview, quick stats
+/recommendations
+recommendations/page.tsx
+Ranked course list with weight sliders and filters
+/course/[id]
+course/[id]/page.tsx
+Full course detail (GPA chart, reviews, prereqs, sections)
+/professor/[slug]
+professor/[slug]/page.tsx
+Professor profile with ratings and course list
+/schedule
+schedule/page.tsx
+CSP schedule builder with calendar preview
+/wishlist
+wishlist/page.tsx
+Saved courses for future semesters
+
+Key shared components: CourseCard, WeightSliders, CalendarView (week-grid), ProgressTracker (degree audit visualization), CartDrawer, CourseSearch (autocomplete), Badge, ProgressBar, Slider.
+6.4 Data Flow
+1. Student opens TerpAdvisor — no sign-in required. Onboarding collects major, track, optional minor, and course history (or transcript upload). All data is persisted to browser localStorage.
+2. Frontend calls POST /api/audit → backend builds requirement tree, runs degree audit, returns progress %.
+3. Frontend calls POST /api/recommendations → backend resolves available courses from the DAG, applies filters, scores via all 7 scorers, returns ranked list with explanations.
+4. Student adjusts weight sliders or filters → frontend re-calls /api/recommendations with updated params.
+5. Student adds courses to cart → POST /api/schedule/generate → CSP solver finds conflict-free schedules ranked by preferences.
+6. Student exports best schedule → POST /api/schedule/export/ical → .ics download.
+7. Student calls POST /api/plan → PlanGenerator returns a semester-by-semester graduation roadmap.
+6.5 Caching Strategy
+All external API data flows through a three-tier cache (LRU in-process → Redis → PostgreSQL). Write-through on all layers; reads promote from lower to higher tiers. Stampede prevention (app/cache/stampede.py) uses a probabilistic early expiration to avoid cache stampede on popular keys near TTL expiration.
+Data
+TTL
+Source
+PlanetTerp GPA / reviews
+24 hours
+Live PlanetTerp API on miss; nightly Celery batch refresh
+PlanetTerp professor ratings
+24 hours
+Live PlanetTerp API on miss
+umd.io course descriptions
+Permanent (Postgres)
+Backfilled on first request, Celery sync at reg period
+Section schedule data
+Per registration period
+umd.io ETL via Celery Beat
+Grade distributions
+24 hours
+Live PlanetTerp /v1/grades on each detail page load
+7. Database Schema (Key Tables)
+Table
+Key Columns
+Purpose
+users
+id, email, display_name, major, minor, created_at
+Student profiles
+courses
+course_id (PK), name, dept, credits, description, avg_gpa, gen_eds, prerequisites_raw
+Master course catalog
+professors
+id, name, slug, avg_rating, review_count
+Professor data from PlanetTerp
+reviews
+id, course_id, professor_id, rating, text, created_at
+Cached PlanetTerp reviews
+sections
+section_id, course_id, professor_id, semester, days, start_time, end_time, open_seats, total_seats
+Section schedule from umd.io
+cart_items
+id, user_id, course_id, section_id, added_at
+Per-user cart for current semester
+wishlist_items
+id, user_id, course_id, added_at
+Saved courses for future semesters
+cache_entries
+key (PK), value (JSON), expires_at, created_at
+Postgres-backed cache tier 3
+
+Note: Degree requirements are built in-memory from Python code (app/engine/degree_audit.py), not stored in the DB. This makes requirement logic version-controllable and easy to update per catalog year without migrations.
+8. API Endpoints
+Method
+Path
+Description
+GET
+/api/health
+Health check (DB + Redis connectivity)
+GET
+/api/courses/search
+Search courses by name or ID (autocomplete)
+GET
+/api/courses/:id
+Full course detail with GPA, reviews, prereqs, sections
+GET
+/api/courses/:id/grades
+Grade distribution from PlanetTerp
+GET
+/api/courses/:id/reviews
+Paginated reviews for a course
+POST
+/api/courses/:id/sync
+On-demand re-sync professor data from PlanetTerp
+POST
+/api/courses/parse-transcript
+Parse raw Testudo transcript text → course list
+POST
+/api/courses/parse-transcript-pdf
+Upload transcript PDF → course list
+POST
+/api/recommendations
+Get personalized ranked recommendations
+POST
+/api/audit
+Run degree audit for a student
+POST
+/api/plan
+Generate multi-semester graduation plan
+POST
+/api/schedule/generate
+CSP schedule optimizer → ranked feasible schedules
+POST
+/api/schedule/export/ical
+Export best schedule as iCal (.ics)
+GET
+/api/professors/:slug
+Professor detail with ratings and courses
+GET/POST/DELETE
+/api/cart
+Cart management (add/list/remove courses)
+GET/POST/DELETE
+/api/wishlist
+Wishlist management
+GET/PUT
+/api/user
+User profile (major, minor, preferences)
+9. Key User Flows
+9.1 First-Time Setup
+1. Student lands on homepage → clicks "Get Started"
+2. No login step — app is immediately accessible
+3. Onboarding: selects major (+ optional track and minor), enters or uploads transcript
+4. System parses transcript (text or PDF), extracts completed courses with credits and gen-eds
+5. POST /api/audit runs → student sees degree progress dashboard
+6. POST /api/recommendations runs → first personalized recommendation feed
+9.2 Semester Planning Session
+1. Student views recommendation feed; adjusts weight sliders (maximize GPA, prioritize requirements, etc.)
+2. Applies filters (department, level, GenEd, min GPA, no 8AMs)
+3. Clicks a course card → full detail page (GPA chart, reviews, prerequisites with completion checkmarks, which requirements it fulfills)
+4. Adds courses to cart → POST /api/schedule/generate → sees ranked conflict-free schedules on the calendar view
+5. Exports best schedule as iCal (.ics) for import into Google/Apple Calendar
+9.3 Graduation Planning
+1. Student navigates to degree audit → sees remaining requirements per group
+2. Submits POST /api/plan with max_credits_per_semester and priority courses
+3. System returns a full semester-by-semester roadmap ("Fall 2026: CMSC330, CMSC351…")
+4. Student uses plan to guide future registration decisions
+10. Implementation Status
+10.1 Backend — Complete
+Feature
+Status
+Notes
+Course catalog (DB + search)
+✅ Done
+Full text search on course_id and name
+Transcript parsing (text)
+✅ Done
+Handles repeated courses, W/AW/XF, gen-ed tags
+Transcript parsing (PDF)
+✅ Done
+PyMuPDF extraction + AP/transfer credit mapping
+Degree audit — CS (4 tracks)
+✅ Done
+General, Data Science, ML, Quantum Information
+Degree audit — Math, InfoSci, Econ, Bio, MechE
+✅ Done
+6 majors total
+Minor support (ULC injection)
+✅ Done
+Any department prefix
+Recommendation engine (7 scorers)
+✅ Done
+All scorers including collaborative filtering
+Adjustable weights + normalization
+✅ Done
+User overrides normalized to sum 1.0
+Course detail with prereq parsing
+✅ Done
+DB → umd.io fallback, persisted on first fetch
+PlanetTerp integration
+✅ Done
+GPA, grade dist, professor ratings, reviews
+Circuit breaker + rate limiter
+✅ Done
+Sliding-window CB, token-bucket RL
+Multi-layer cache (LRU→Redis→Postgres)
+✅ Done
+With stampede prevention and event-driven invalidation
+CSP schedule solver + interval tree
+✅ Done
+Backtracking with forward checking
+iCal export
+✅ Done
+Weekly recurring events for 16-week semester
+Multi-semester planner
+✅ Done
+Topo-sort + greedy semester assignment
+Cart & wishlist APIs
+✅ Done
+
+Celery ETL (full sync + delta sync)
+✅ Done
+Nightly full, hourly delta
+Event bus for cache invalidation
+✅ Done
+In-process pub/sub
+59-test suite
+✅ Done
+Engine, integrations, API tests
+10.2 Frontend — Complete
+Page / Component
+Status
+Landing page (no login)
+✅ Done
+Onboarding (major + transcript upload)
+✅ Done
+Dashboard (degree progress)
+✅ Done
+Recommendations page + weight sliders
+✅ Done
+Course detail page
+✅ Done
+Professor detail page
+✅ Done
+Schedule builder + calendar view
+✅ Done
+Wishlist page
+✅ Done
+Cart drawer
+✅ Done
+Course search (autocomplete)
+✅ Done
+10.3 Remaining / Stretch
+Feature
+Status
+Notes
+Production deployment (Vercel + Railway)
+⬜ Pending
+Ready to deploy; env vars needed
+N/A — removed
+❌ Removed
+No auth will be implemented; localStorage is the persistence layer
+Seat-opening push notifications
+⬜ Stretch
+Would require WebSocket or polling + user notification prefs
+Social schedule sharing
+⬜ Stretch
+Privacy implications; post-MVP
+Community review upvotes
+⬜ Stretch
+Helpful votes on PlanetTerp review excerpts
+Mobile app (React Native)
+⬜ Stretch
+Post-launch if adoption warrants it
+Broader major coverage (20+ majors)
+⬜ Stretch
+6 majors currently
+11. Risks & Mitigations
+Risk
+Impact
+Mitigation
+PlanetTerp API downtime
+High
+Circuit breaker fast-fails after 5 failures; 3-tier cache serves stale data; nightly batch refresh ensures freshness
+Degree requirement data stale
+Medium
+Requirements are version-controlled Python code; flag if catalog year changes
+umd.io API lag / deprecation
+Medium
+Direct umd.io fetch on miss; description persisted to Postgres on first fetch
+Incorrect prerequisite mapping
+High
+"Report Issue" button planned; manual review queue for corrections
+Redis unavailable
+Low–Medium
+LRU cache (layer 1) and Postgres cache (layer 3) maintain service degraded
+Low initial adoption
+Medium
+Launch with CS community first; post on r/UMD and UMD CS Discord
+Transcript parser edge cases
+Low
+Comprehensive regex with 59 test cases; AP/transfer credit handling implemented
+12. Competitive Landscape
+Tool
+What It Does
+What It Lacks
+PlanetTerp
+GPA data, professor reviews, grade distributions
+No recommendations, no degree tracking, no personalization
+Testudo / Venus
+Official schedule builder, seat availability
+No GPA data, no reviews, no intelligence
+Jupiterp
+Schedule planner with PlanetTerp ratings inline
+No degree-aware recommendations, no preference engine
+Courseoff
+Visual schedule builder
+No UMD-specific data enrichment, no recommendations
+TerpAdvisor (this)
+Degree-aware, GPA-ranked, review-enriched, preference-filtered recs + CSP schedule + multi-semester plan + iCal export
+New entrant; needs trust and data coverage
+13. Open Questions
+Should the collaborative filtering scorer be trained on real aggregate grade distribution co-enrollment data from PlanetTerp, rather than the current hardcoded CS patterns?
+Should TerpAdvisor support graduate courses, or stay undergrad-only?
+How to handle special-topics courses (e.g., CMSC389) that change content each semester?
+Is there appetite for Testudo waitlist integration (push notification when a seat opens)?
+Should the recommendation engine incorporate professor-specific GPA (not just course-level)?
+When should social features (schedule sharing, review upvotes) be prioritized relative to deployment and adoption?
+14. Estimated Remaining Timeline
+Milestone
+Target
+Key Deliverables
+Production deployment
+Week 1-2
+Vercel frontend, Railway backend, Postgres + Redis provisioned, env vars, domain
+N/A — removed
+Week 1-2
+No auth planned; removed from scope
+Beta launch
+Week 3
+Soft launch to UMD CS community, r/UMD post, Discord announcement
+Feedback iteration
+Week 4-6
+Address UX bugs, requirement mapping corrections, performance tuning
+Broader major coverage
+Week 7-8
+Expand from 6 to 10+ majors based on demand
+Stretch features
+Week 9+
+Seat notifications, social sharing, mobile if warranted
+
+End of Document
