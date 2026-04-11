@@ -1,6 +1,7 @@
 import Link from "next/link";
 import SidebarUser from "@/components/SidebarUser";
 import CartButton from "@/components/CartButton";
+import OnboardingGuard from "@/components/OnboardingGuard";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
@@ -53,6 +54,7 @@ function WishlistIcon() {
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen flex">
+      <OnboardingGuard />
       {/* Sidebar */}
       <aside className="w-64 bg-[var(--umd-black)] text-white flex flex-col fixed h-full z-20">
         {/* Logo */}

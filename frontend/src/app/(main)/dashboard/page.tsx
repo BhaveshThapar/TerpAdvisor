@@ -160,7 +160,7 @@ export default function DashboardPage() {
               // For groups with a single requirement that tracks multiple courses (e.g. 400-level, ULC),
               // show courses_completed/courses_needed instead of requirements satisfied count.
               const singleReq = group.total_count === 1 ? group.requirements[0] : null;
-              const displayNum = singleReq ? singleReq.courses_completed : group.completed_count;
+              const displayNum = singleReq ? Math.min(singleReq.courses_completed, singleReq.courses_needed) : group.completed_count;
               const displayDen = singleReq ? singleReq.courses_needed : (group.min_required ?? group.total_count);
               const barPct = singleReq
                 ? Math.min(100, (singleReq.courses_completed / singleReq.courses_needed) * 100)
