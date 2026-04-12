@@ -56,7 +56,8 @@ function formatTime(time: string): string {
 function CalendarGrid({ schedule }: { schedule: ScheduleResult }) {
   return (
     <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
-      <div className="grid grid-cols-6 border-b border-black/5">
+      <div className="overflow-x-auto">
+      <div className="grid grid-cols-6 border-b border-black/5 min-w-[480px]">
         <div className="p-3 text-xs font-medium text-[var(--umd-gray)]">Time</div>
         {DAYS.map((day) => (
           <div key={day} className="p-3 text-xs font-bold text-[var(--umd-black)] text-center border-l border-black/5">
@@ -64,7 +65,7 @@ function CalendarGrid({ schedule }: { schedule: ScheduleResult }) {
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-6 relative" style={{ minHeight: 600 }}>
+      <div className="grid grid-cols-6 relative min-w-[480px]" style={{ minHeight: 600 }}>
         {/* Time labels */}
         <div className="border-r border-black/5">
           {HOURS.map((hour) => (
@@ -108,6 +109,7 @@ function CalendarGrid({ schedule }: { schedule: ScheduleResult }) {
             )}
           </div>
         ))}
+      </div>
       </div>
     </div>
   );

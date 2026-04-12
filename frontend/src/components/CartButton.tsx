@@ -2,13 +2,17 @@
 import { useState } from "react";
 import CartDrawer from "@/components/cart/CartDrawer";
 
-export default function CartButton() {
+export default function CartButton({ variant = "dark" }: { variant?: "dark" | "light" }) {
   const [open, setOpen] = useState(false);
+  const colorClass =
+    variant === "light"
+      ? "text-[var(--umd-gray)] hover:text-[var(--umd-black)] hover:bg-black/5"
+      : "text-white/70 hover:text-white hover:bg-white/10";
   return (
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${colorClass}`}
       >
         <svg
           className="w-5 h-5"

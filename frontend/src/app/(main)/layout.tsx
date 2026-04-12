@@ -2,6 +2,7 @@ import Link from "next/link";
 import SidebarUser from "@/components/SidebarUser";
 import CartButton from "@/components/CartButton";
 import OnboardingGuard from "@/components/OnboardingGuard";
+import MobileBottomNav from "@/components/layout/MobileBottomNav";
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: DashboardIcon },
@@ -55,8 +56,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   return (
     <div className="min-h-screen flex">
       <OnboardingGuard />
-      {/* Sidebar */}
-      <aside className="w-64 bg-[var(--umd-black)] text-white flex flex-col fixed h-full z-20">
+
+      {/* Sidebar — hidden on mobile, visible on md+ */}
+      <aside className="hidden md:flex w-64 bg-[var(--umd-black)] text-white flex-col fixed h-full z-20">
         {/* Logo */}
         <div className="px-6 py-5 border-b border-white/10">
           <Link href="/" className="flex items-center gap-3">
@@ -94,20 +96,34 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </aside>
 
       {/* Main content area */}
-      <div className="flex-1 ml-64">
+      <div className="flex-1 md:ml-64 min-w-0">
         {/* Header */}
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-black/5 px-8 py-4 flex items-center justify-between">
-          <div />
-          <div className="flex items-center gap-4">
+        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-black/5 px-4 md:px-8 py-3 md:py-4 flex items-center justify-between">
+          {/* Mobile: show branding; desktop: empty left side */}
+          <Link href="/dashboard" className="flex items-center gap-2 md:hidden">
+            <div className="w-7 h-7 rounded-md bg-[var(--umd-red)] flex items-center justify-center font-bold text-xs text-white tracking-tight">
+              TA
+            </div>
+            <span className="text-sm font-bold text-[var(--umd-black)]">TerpAdvisor</span>
+          </Link>
+          <div className="hidden md:block" />
+          <div className="flex items-center gap-3">
             <span className="text-xs text-[var(--umd-gray)] bg-[var(--umd-gold)]/15 px-3 py-1 rounded-full font-medium">
               Fall 2026
             </span>
+            {/* Mobile cart button */}
+            <div className="md:hidden">
+              <CartButton variant="light" />
+            </div>
           </div>
         </header>
 
-        {/* Page content */}
-        <main className="p-8">{children}</main>
+        {/* Page content — extra bottom padding on mobile for the bottom nav */}
+        <main className="p-4 md:p-8 pb-20 md:pb-8">{children}</main>
       </div>
+
+      {/* Mobile bottom navigation */}
+      <MobileBottomNav />
     </div>
   );
 }
