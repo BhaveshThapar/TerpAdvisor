@@ -6,8 +6,32 @@ incremental data synchronization.
 """
 
 import logging
+from datetime import datetime
 
 from app.workers.celery_app import celery_app
+
+
+def _current_semester() -> str:
+    """Return the umd.io semester code (YYYYMM) for the current active semester."""
+    now = datetime.now()
+    year, month = now.year, now.month
+    if month >= 8:
+        return f"{year}08"   # Fall starts August
+    elif month >= 5:
+        return f"{year}05"   # Summer starts May
+    else:
+        return f"{year}01"   # Spring starts January
+
+
+def _previous_semester(current: str) -> str:
+    """Return the semester code immediately before the given one."""
+    year, code = int(current[:4]), current[4:]
+    if code == "08":
+        return f"{year}01"
+    elif code == "05":
+        return f"{year - 1}08"
+    else:
+        return f"{year - 1}08"
 
 logger = logging.getLogger(__name__)
 
@@ -23,16 +47,21 @@ def full_sync(self):
         pt_etl = PlanetTerpETL()
         umd_etl = UmdIoETL()
 
-        pt_results = pt_etl.sync_all_courses()
-        umd_results = umd_etl.sync_all_sections()
+        current = _current_semester()
+        previous = _previous_semester(current)
 
+        pt_results = pt_etl.sync_all_courses()
+        umd_current = umd_etl.sync_all_sections(current)
+        umd_previous = umd_etl.sync_all_sections(previous)
+
+        total_sections = umd_current["sections_synced"] + umd_previous["sections_synced"]
         logger.info(
             f"Full sync complete: {pt_results['courses_synced']} courses, "
-            f"{umd_results['sections_synced']} sections"
+            f"{total_sections} sections ({current} + {previous})"
         )
         return {
             "planetterp": pt_results,
-            "umdio": umd_results,
+            "umdio": {"current": umd_current, "previous": umd_previous},
         }
     except Exception as exc:
         logger.error(f"Full sync failed: {exc}")

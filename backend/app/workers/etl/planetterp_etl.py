@@ -31,31 +31,52 @@ class PlanetTerpETL:
         self.client = httpx.Client(timeout=30.0)
 
     def sync_all_courses(self) -> dict:
-        """Full sync — fetch all courses from PlanetTerp."""
-        logger.info("PlanetTerp full sync: fetching all courses")
+        """Full sync — fetch all courses from PlanetTerp by department to get full catalog."""
+        logger.info("PlanetTerp full sync: fetching courses by department")
         courses_synced = 0
         errors = 0
 
-        try:
-            response = self.client.get(f"{self.base_url}/courses")
-            if response.status_code != 200:
-                logger.error(f"Failed to fetch courses: {response.status_code}")
-                return {"courses_synced": 0, "errors": 1}
+        # All UMD department prefixes — same list used in courses.py
+        all_depts = [
+            "AASP", "AAST", "AGNR", "AMSC", "AMST", "ANSC", "ANTH", "AOSC", "ARAB",
+            "ARCH", "AREC", "ARHU", "ARMY", "ARSC", "ARTH", "ARTT", "ASTR", "BCHM",
+            "BIOE", "BIOL", "BIOM", "BIPH", "BMGT", "BSCI", "BSCV", "BSOS", "BSST",
+            "BUAC", "BUDT", "BUFN", "BULM", "BUMK", "BUMO", "BUSI", "BUSM", "CCJS",
+            "CHBE", "CHEM", "CHIN", "CHPH", "CINE", "CLAS", "CLFS", "CMLT", "CMSC",
+            "COMM", "CPMS", "CPSD", "CPSP", "DANC", "ECON", "EDCI", "EDCP", "EDHD",
+            "EDHI", "EDMS", "EDPS", "EDSP", "EDUC", "ENAE", "ENCE", "ENCH", "ENCO",
+            "ENEE", "ENES", "ENFP", "ENGL", "ENMA", "ENME", "ENPM", "ENPP", "ENRE",
+            "ENSE", "ENSP", "ENST", "ENTM", "EPIB", "FGSM", "FILM", "FIRE", "FMSC",
+            "FOLA", "FREN", "GEMS", "GEOG", "GEOL", "GERM", "GREK", "GVPT", "HACS",
+            "HDCC", "HEBR", "HEIP", "HESP", "HHUM", "HISP", "HIST", "HLSA", "HLSC",
+            "HLTH", "HONR", "IDEA", "IMDM", "IMMR", "INAG", "INFM", "INST", "ISRL",
+            "ITAL", "JAPN", "JOUR", "JWST", "KINE", "KNES", "KORA", "LACS", "LARC",
+            "LATN", "LBSC", "LING", "MATH", "MEES", "MIEH", "MITH", "MLSC", "MSML",
+            "MUSC", "NACS", "NAVY", "NFSC", "PERS", "PHIL", "PHPE", "PHSC", "PHYS",
+            "PLCY", "PLSC", "PORT", "PSYC", "PUAF", "RDEV", "RELS", "RUSS", "SLAA",
+            "SLLC", "SOCY", "SPAN", "SPHL", "STAT", "SURV", "TDPS", "THET", "TLPL",
+            "TLTC", "UMEI", "UNIV", "URSP", "USLT", "VMSC", "WMST",
+        ]
 
-            courses = response.json()
-            with SyncSession() as session:
-                for course in courses:
+        for dept in all_depts:
+            try:
+                response = self.client.get(
+                    f"{self.base_url}/courses", params={"department": dept}
+                )
+                if response.status_code != 200:
+                    continue
+                for course in response.json():
                     try:
-                        self._process_course(session, course)
+                        with SyncSession() as session:
+                            self._process_course(session, course)
+                            session.commit()
                         courses_synced += 1
                     except Exception as e:
                         logger.warning(f"Error processing course {course.get('name', '?')}: {e}")
                         errors += 1
-                session.commit()
-
-        except httpx.HTTPError as e:
-            logger.error(f"HTTP error during full sync: {e}")
-            errors += 1
+            except httpx.HTTPError as e:
+                logger.warning(f"HTTP error fetching dept {dept}: {e}")
+                errors += 1
 
         _last_sync["full"] = datetime.now(timezone.utc)
         return {"courses_synced": courses_synced, "errors": errors}
@@ -141,15 +162,15 @@ class PlanetTerpETL:
         ).scalar_one_or_none()
 
         if existing:
-            existing.name = course_data.get("title", existing.name) or existing.name
+            existing.name = course_data.get("title") or existing.name
             existing.department = dept or existing.department
             existing.avg_gpa = course_data.get("average_gpa") or existing.avg_gpa
         else:
             course = Course(
                 course_id=course_id,
-                name=course_data.get("title", course_id),
+                name=course_data.get("title") or course_id,
                 department=dept,
-                credits=course_data.get("credits", 3),
+                credits=course_data.get("credits") or 3,
                 avg_gpa=course_data.get("average_gpa"),
             )
             session.add(course)
