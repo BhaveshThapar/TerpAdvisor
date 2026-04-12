@@ -6,7 +6,7 @@ export default function CartButton({ variant = "dark" }: { variant?: "dark" | "l
   const [open, setOpen] = useState(false);
   const colorClass =
     variant === "light"
-      ? "text-[var(--umd-gray)] hover:text-[var(--umd-black)] hover:bg-black/5"
+      ? "text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-black/5"
       : "text-white/70 hover:text-white hover:bg-white/10";
   return (
     <>

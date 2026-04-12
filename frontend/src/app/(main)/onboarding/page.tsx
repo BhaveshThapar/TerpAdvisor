@@ -165,8 +165,8 @@ export default function OnboardingPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[var(--umd-black)]">Welcome to TerpAdvisor</h1>
-        <p className="text-sm text-[var(--umd-gray)] mt-1">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Welcome to TerpAdvisor</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-1">
           Let&apos;s set up your profile so we can give you personalized recommendations.
         </p>
       </div>
@@ -176,7 +176,7 @@ export default function OnboardingPage() {
         {[1, 2, 3].map((s) => (
           <div key={s} className="flex items-center gap-2">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-              s <= step ? "bg-[var(--umd-red)] text-white" : "bg-gray-200 text-[var(--umd-gray)]"
+              s <= step ? "bg-[var(--umd-red)] text-white" : "bg-white/10 text-[var(--text-muted)]"
             }`}>
               {s < step ? (
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
@@ -184,19 +184,19 @@ export default function OnboardingPage() {
                 </svg>
               ) : s}
             </div>
-            <span className={`text-xs font-medium ${s <= step ? "text-[var(--umd-black)]" : "text-[var(--umd-gray)]"}`}>
+            <span className={`text-xs font-medium ${s <= step ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
               {s === 1 ? "Courses" : s === 2 ? "Major" : "Confirm"}
             </span>
-            {s < 3 && <div className="w-12 h-0.5 bg-gray-200 rounded" />}
+            {s < 3 && <div className="w-12 h-0.5 bg-white/10 rounded" />}
           </div>
         ))}
       </div>
 
       {/* Step 1: Add Completed Courses */}
       {step === 1 && (
-        <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
-          <h2 className="text-lg font-bold text-[var(--umd-black)] mb-1">Add Completed Courses</h2>
-          <p className="text-sm text-[var(--umd-gray)] mb-4">
+        <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 border border-[var(--border-dark)] shadow-sm">
+          <h2 className="text-lg font-bold text-[var(--text-primary)] mb-1">Add Completed Courses</h2>
+          <p className="text-sm text-[var(--text-muted)] mb-4">
             Upload your Testudo transcript to automatically import your courses and detect your major.
           </p>
 
@@ -206,8 +206,8 @@ export default function OnboardingPage() {
               onClick={() => setInputMode("search")}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                 inputMode === "search"
-                  ? "bg-white text-[var(--umd-black)] shadow-sm"
-                  : "text-[var(--umd-gray)] hover:text-[var(--umd-black)]"
+                  ? "bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
               }`}
             >
               Search Courses
@@ -216,8 +216,8 @@ export default function OnboardingPage() {
               onClick={() => setInputMode("paste")}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                 inputMode === "paste"
-                  ? "bg-white text-[var(--umd-black)] shadow-sm"
-                  : "text-[var(--umd-gray)] hover:text-[var(--umd-black)]"
+                  ? "bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
               }`}
             >
               Paste Transcript
@@ -226,8 +226,8 @@ export default function OnboardingPage() {
               onClick={() => setInputMode("upload")}
               className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                 inputMode === "upload"
-                  ? "bg-white text-[var(--umd-black)] shadow-sm"
-                  : "text-[var(--umd-gray)] hover:text-[var(--umd-black)]"
+                  ? "bg-[var(--bg-secondary)] text-[var(--text-primary)] shadow-sm"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
               }`}
             >
               Upload PDF
@@ -265,7 +265,7 @@ export default function OnboardingPage() {
                   dragOver
                     ? "border-[var(--umd-red)] bg-[var(--umd-red)]/5"
                     : uploadFile
-                    ? "border-emerald-300 bg-emerald-50"
+                    ? "border-emerald-300 bg-emerald-500/10"
                     : "border-black/15 bg-[var(--umd-light)] hover:border-[var(--umd-red)]/40 hover:bg-[var(--umd-red)]/5"
                 }`}
               >
@@ -275,22 +275,22 @@ export default function OnboardingPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                     <div className="text-center">
-                      <p className="text-sm font-semibold text-[var(--umd-black)]">{uploadFile.name}</p>
-                      <p className="text-xs text-[var(--umd-gray)] mt-0.5">
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">{uploadFile.name}</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">
                         {(uploadFile.size / 1024).toFixed(0)} KB — Click to change
                       </p>
                     </div>
                   </>
                 ) : (
                   <>
-                    <svg className="w-10 h-10 text-[var(--umd-gray)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <svg className="w-10 h-10 text-[var(--text-muted)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12H9.75m0 0l2.25 2.25M9.75 14.25l2.25-2.25M6.375 20.25h8.25a2.25 2.25 0 002.25-2.25V6.108c0-.597-.237-1.17-.659-1.591l-2.608-2.609a2.25 2.25 0 00-1.591-.659H6.375a2.25 2.25 0 00-2.25 2.25v16.5a2.25 2.25 0 002.25 2.25z" />
                     </svg>
                     <div className="text-center">
-                      <p className="text-sm font-semibold text-[var(--umd-black)]">
+                      <p className="text-sm font-semibold text-[var(--text-primary)]">
                         Drop your Testudo transcript here
                       </p>
-                      <p className="text-xs text-[var(--umd-gray)] mt-0.5">
+                      <p className="text-xs text-[var(--text-muted)] mt-0.5">
                         or click to browse — PDF files only, max 10 MB
                       </p>
                     </div>
@@ -332,7 +332,7 @@ export default function OnboardingPage() {
                 }}
                 rows={6}
                 placeholder="Paste your transcript, course list, or any text containing course IDs (e.g., CMSC131, MATH140). We'll extract your courses and major automatically."
-                className="w-full px-4 py-3 rounded-lg border border-black/10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)] resize-none font-mono placeholder:font-sans placeholder:text-[var(--umd-gray)]"
+                className="w-full px-4 py-3 rounded-lg border border-[var(--border-dark)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)] resize-none font-mono placeholder:font-sans placeholder:text-[var(--text-muted)]"
               />
 
               {pasteError && (
@@ -359,32 +359,32 @@ export default function OnboardingPage() {
 
           {/* Parse results — shown for both paste and upload modes */}
           {(inputMode === "paste" || inputMode === "upload") && parseResult && (
-            <div className="mt-4 rounded-xl border border-black/10 overflow-hidden">
+            <div className="mt-4 rounded-xl border border-[var(--border-dark)] overflow-hidden">
               {/* Header */}
-              <div className="p-4 border-b border-black/5 bg-green-50/50">
-                <p className="text-sm font-semibold text-green-800 flex items-center gap-2">
+              <div className="p-4 border-b border-[var(--border-dark)] bg-green-500/10/50">
+                <p className="text-sm font-semibold text-green-200 flex items-center gap-2">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
                   </svg>
                   Found {parseResult.courses.length} course{parseResult.courses.length !== 1 ? "s" : ""}
-                  <span className="text-xs font-normal text-green-700">
+                  <span className="text-xs font-normal text-green-300">
                     · {parseResult.total_credits} total credits
                   </span>
                 </p>
                 {parseResult.major && (
-                  <p className="text-xs text-green-700 mt-1">Major detected: <span className="font-semibold">{parseResult.major}</span></p>
+                  <p className="text-xs text-green-300 mt-1">Major detected: <span className="font-semibold">{parseResult.major}</span></p>
                 )}
                 <div className="mt-2 flex gap-2">
                   <button
                     onClick={() => setParsedChecked(new Set(parseResult.courses.map(c => c.course_id)))}
-                    className="text-xs text-green-700 hover:text-green-900 font-medium"
+                    className="text-xs text-green-300 hover:text-green-900 font-medium"
                   >
                     Select All
                   </button>
                   <span className="text-xs text-green-400">·</span>
                   <button
                     onClick={() => setParsedChecked(new Set())}
-                    className="text-xs text-green-700 hover:text-green-900 font-medium"
+                    className="text-xs text-green-300 hover:text-green-900 font-medium"
                   >
                     Deselect All
                   </button>
@@ -394,7 +394,7 @@ export default function OnboardingPage() {
               {/* Course rows */}
               <div className="divide-y divide-black/5 max-h-[400px] overflow-y-auto">
                 {parseResult.courses.map((c) => (
-                  <label key={c.course_id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50/80 cursor-pointer transition-colors">
+                  <label key={c.course_id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-[var(--bg-elevated)]/80 cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={parsedChecked.has(c.course_id)}
@@ -410,23 +410,23 @@ export default function OnboardingPage() {
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold font-mono text-[var(--umd-black)]">{c.course_id}</span>
+                        <span className="text-sm font-bold font-mono text-[var(--text-primary)]">{c.course_id}</span>
                         {c.grade && (
                           <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
-                            c.in_progress ? "bg-amber-100 text-amber-700"
-                            : c.grade.startsWith("A") ? "bg-green-100 text-green-700"
-                            : c.grade.startsWith("B") ? "bg-blue-100 text-blue-700"
+                            c.in_progress ? "bg-amber-500/15 text-amber-300"
+                            : c.grade.startsWith("A") ? "bg-green-500/15 text-green-300"
+                            : c.grade.startsWith("B") ? "bg-blue-500/15 text-blue-300"
                             : c.grade === "TR" ? "bg-purple-100 text-purple-700"
-                            : "bg-gray-100 text-gray-600"
+                            : "bg-[var(--bg-elevated)] text-[var(--text-muted)]"
                           }`}>{c.in_progress ? "In Progress" : c.grade}{c.grade === "TR" ? " (Transfer)" : ""}</span>
                         )}
                         {!c.in_catalog && (
-                          <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-medium">Not in catalog</span>
+                          <span className="text-[10px] text-amber-600 bg-amber-500/10 px-1.5 py-0.5 rounded font-medium">Not in catalog</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5">
                         {c.name && (
-                          <span className="text-xs text-[var(--umd-gray)] truncate">{c.name}</span>
+                          <span className="text-xs text-[var(--text-muted)] truncate">{c.name}</span>
                         )}
                       </div>
                     </div>
@@ -441,7 +441,7 @@ export default function OnboardingPage() {
                         </div>
                       )}
                       {c.credits != null && (
-                        <span className="text-xs text-[var(--umd-gray)] font-medium w-8 text-right">{c.credits}cr</span>
+                        <span className="text-xs text-[var(--text-muted)] font-medium w-8 text-right">{c.credits}cr</span>
                       )}
                     </div>
                   </label>
@@ -450,14 +450,14 @@ export default function OnboardingPage() {
 
               {/* Empty state */}
               {parseResult.courses.length === 0 && (
-                <div className="p-4 text-sm text-[var(--umd-gray)]">
+                <div className="p-4 text-sm text-[var(--text-muted)]">
                   No course IDs found. Try a different transcript or include course codes like CMSC131 or MATH140.
                 </div>
               )}
 
               {/* Add selected button */}
               {parseResult.courses.length > 0 && (
-                <div className="p-4 border-t border-black/5">
+                <div className="p-4 border-t border-[var(--border-dark)]">
                   <button
                     onClick={handleAddParsed}
                     disabled={parsedChecked.size === 0}
@@ -473,17 +473,17 @@ export default function OnboardingPage() {
           {/* Added courses list */}
           {courses.length > 0 && (
             <div className="mt-4 space-y-2">
-              <p className="text-xs font-medium text-[var(--umd-gray)]">{courses.length} course{courses.length !== 1 ? "s" : ""} added</p>
+              <p className="text-xs font-medium text-[var(--text-muted)]">{courses.length} course{courses.length !== 1 ? "s" : ""} added</p>
               <div className="flex flex-wrap gap-2">
                 {courses.map((c) => (
                   <span
                     key={c.course_id}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--umd-light)] text-sm font-medium text-[var(--umd-black)]"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--umd-light)] text-sm font-medium text-[var(--text-primary)]"
                   >
                     {c.course_id}
                     <button
                       onClick={() => handleRemoveCourse(c.course_id)}
-                      className="text-[var(--umd-gray)] hover:text-[var(--umd-red)] transition-colors"
+                      className="text-[var(--text-muted)] hover:text-[var(--umd-red)] transition-colors"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                         <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -511,9 +511,9 @@ export default function OnboardingPage() {
 
       {/* Step 2: Major & Minor */}
       {step === 2 && (
-        <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
-          <h2 className="text-lg font-bold text-[var(--umd-black)] mb-1">Your Major</h2>
-          <p className="text-sm text-[var(--umd-gray)] mb-5">
+        <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 border border-[var(--border-dark)] shadow-sm">
+          <h2 className="text-lg font-bold text-[var(--text-primary)] mb-1">Your Major</h2>
+          <p className="text-sm text-[var(--text-muted)] mb-5">
             {majorDetected
               ? "We detected your major from your transcript. Confirm or edit it below."
               : "Enter your major below. You can update this later from your profile."}
@@ -521,7 +521,7 @@ export default function OnboardingPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="text-xs font-medium text-[var(--umd-gray)] block mb-1.5">
+              <label className="text-xs font-medium text-[var(--text-muted)] block mb-1.5">
                 Major
                 {majorDetected && (
                   <span className="ml-2 text-green-600 font-normal">· detected from transcript</span>
@@ -533,16 +533,16 @@ export default function OnboardingPage() {
                 value={major}
                 onChange={(e) => { setMajor(e.target.value); setMajorDetected(false); }}
                 placeholder="e.g., Computer Science"
-                className="w-full px-4 py-2.5 rounded-lg border border-black/10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)]"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-dark)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)]"
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-[var(--umd-gray)] block mb-1.5">Track / Specialization</label>
+              <label className="text-xs font-medium text-[var(--text-muted)] block mb-1.5">Track / Specialization</label>
               <select
                 value={track}
                 onChange={(e) => setTrack(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-black/10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)] bg-white"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-dark)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)] bg-[var(--bg-secondary)]"
               >
                 <option value="General">General</option>
                 <option value="Cybersecurity">Cybersecurity</option>
@@ -553,14 +553,14 @@ export default function OnboardingPage() {
             </div>
 
             <div>
-              <label className="text-xs font-medium text-[var(--umd-gray)] block mb-1.5">Minor (optional)</label>
+              <label className="text-xs font-medium text-[var(--text-muted)] block mb-1.5">Minor (optional)</label>
               <input
                 type="text"
                 autoComplete="off"
                 value={minor}
                 onChange={(e) => setMinor(e.target.value)}
                 placeholder="e.g., Statistics"
-                className="w-full px-4 py-2.5 rounded-lg border border-black/10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)]"
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-dark)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)]"
               />
             </div>
           </div>
@@ -568,7 +568,7 @@ export default function OnboardingPage() {
           <div className="mt-6 flex gap-3">
             <button
               onClick={() => setStep(1)}
-              className="flex-1 py-2.5 rounded-lg border border-black/10 text-sm font-semibold text-[var(--umd-gray)] hover:bg-[var(--umd-light)] transition-colors"
+              className="flex-1 py-2.5 rounded-lg border border-[var(--border-dark)] text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--umd-light)] transition-colors"
             >
               Back
             </button>
@@ -585,29 +585,29 @@ export default function OnboardingPage() {
 
       {/* Step 3: Confirm */}
       {step === 3 && (
-        <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
-          <h2 className="text-lg font-bold text-[var(--umd-black)] mb-4">Confirm Your Profile</h2>
+        <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 border border-[var(--border-dark)] shadow-sm">
+          <h2 className="text-lg font-bold text-[var(--text-primary)] mb-4">Confirm Your Profile</h2>
 
           <div className="space-y-4">
-            <div className="flex items-center justify-between py-3 border-b border-black/5">
-              <span className="text-sm text-[var(--umd-gray)]">Major</span>
-              <span className="text-sm font-semibold text-[var(--umd-black)]">{major}</span>
+            <div className="flex items-center justify-between py-3 border-b border-[var(--border-dark)]">
+              <span className="text-sm text-[var(--text-muted)]">Major</span>
+              <span className="text-sm font-semibold text-[var(--text-primary)]">{major}</span>
             </div>
             {minor && (
-              <div className="flex items-center justify-between py-3 border-b border-black/5">
-                <span className="text-sm text-[var(--umd-gray)]">Minor</span>
-                <span className="text-sm font-semibold text-[var(--umd-black)]">{minor}</span>
+              <div className="flex items-center justify-between py-3 border-b border-[var(--border-dark)]">
+                <span className="text-sm text-[var(--text-muted)]">Minor</span>
+                <span className="text-sm font-semibold text-[var(--text-primary)]">{minor}</span>
               </div>
             )}
             <div className="py-3">
-              <span className="text-sm text-[var(--umd-gray)]">Completed Courses ({courses.length})</span>
+              <span className="text-sm text-[var(--text-muted)]">Completed Courses ({courses.length})</span>
               <div className="flex flex-wrap gap-2 mt-2">
                 {courses.length > 0 ? courses.map((c) => (
                   <span key={c.course_id} className="text-xs font-medium bg-[var(--umd-light)] px-2.5 py-1 rounded-lg">
                     {c.course_id}
                   </span>
                 )) : (
-                  <span className="text-xs text-[var(--umd-gray)]">None added (you can add them later)</span>
+                  <span className="text-xs text-[var(--text-muted)]">None added (you can add them later)</span>
                 )}
               </div>
             </div>
@@ -618,7 +618,7 @@ export default function OnboardingPage() {
           <div className="mt-6 flex gap-3">
             <button
               onClick={() => setStep(2)}
-              className="flex-1 py-2.5 rounded-lg border border-black/10 text-sm font-semibold text-[var(--umd-gray)] hover:bg-[var(--umd-light)] transition-colors"
+              className="flex-1 py-2.5 rounded-lg border border-[var(--border-dark)] text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--umd-light)] transition-colors"
             >
               Back
             </button>

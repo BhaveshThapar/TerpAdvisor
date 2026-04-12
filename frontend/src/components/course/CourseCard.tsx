@@ -46,7 +46,7 @@ export default function CourseCard({
         <div className="min-w-0 flex-1">
           {/* Header row */}
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-lg font-bold text-gray-900">{course_id}</h3>
+            <h3 className="text-lg font-bold text-[var(--text-primary)]">{course_id}</h3>
             {avg_gpa != null && (
               <Badge
                 text={`GPA: ${avg_gpa.toFixed(2)}`}
@@ -64,7 +64,7 @@ export default function CourseCard({
           </div>
 
           {/* Top reason */}
-          <p className="mt-1 text-sm text-gray-600">{top_reason}</p>
+          <p className="mt-1 text-sm text-[var(--text-muted)]">{top_reason}</p>
 
           {/* Expand toggle */}
           <button
@@ -77,22 +77,22 @@ export default function CourseCard({
 
           {/* Expanded explanation breakdown */}
           {expanded && (
-            <div className="mt-3 space-y-2 border-t border-gray-100 pt-3">
+            <div className="mt-3 space-y-2 border-t border-[var(--border-dark)] pt-3">
               {explanations.map((exp) => (
                 <div key={exp.factor} className="text-sm">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium text-gray-700">
+                    <span className="font-medium text-white/80">
                       {exp.factor}
                     </span>
-                    <span className="text-gray-500">
+                    <span className="text-[var(--text-muted)]">
                       {(exp.score * 100).toFixed(0)} x{" "}
                       {(exp.weight * 100).toFixed(0)}% ={" "}
-                      <span className="font-semibold text-gray-800">
+                      <span className="font-semibold text-[var(--text-primary)]">
                         {(exp.contribution * 100).toFixed(1)}
                       </span>
                     </span>
                   </div>
-                  <p className="mt-0.5 text-gray-500">{exp.text}</p>
+                  <p className="mt-0.5 text-[var(--text-muted)]">{exp.text}</p>
                 </div>
               ))}
             </div>

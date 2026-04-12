@@ -58,8 +58,8 @@ function WeightSlider({
   return (
     <div>
       <div className="flex items-center justify-between mb-1.5">
-        <span className="text-xs font-medium text-[var(--umd-black)]">{label}</span>
-        <span className="text-xs font-bold text-[var(--umd-gray)]">{Math.round(value * 100)}%</span>
+        <span className="text-xs font-medium text-[var(--text-primary)]">{label}</span>
+        <span className="text-xs font-bold text-[var(--text-muted)]">{Math.round(value * 100)}%</span>
       </div>
       <input
         type="range"
@@ -67,7 +67,7 @@ function WeightSlider({
         max={100}
         value={Math.round(value * 100)}
         onChange={(e) => onChange(factor, Number(e.target.value) / 100)}
-        className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer accent-[var(--umd-red)]"
+        className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-[var(--umd-red)]"
       />
     </div>
   );
@@ -92,7 +92,7 @@ function RecommendationCard({
 }) {
   const pct = Math.round(rec.final_score);
   return (
-    <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-dark)] shadow-sm overflow-hidden hover:shadow-md transition-shadow">
       <div className="p-5">
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-xl bg-[var(--umd-red)] text-white flex items-center justify-center text-sm font-bold shrink-0">
@@ -100,17 +100,17 @@ function RecommendationCard({
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3 flex-wrap">
-              <Link href={`/course/${rec.course_id}`} className="text-lg font-bold text-[var(--umd-black)] hover:text-[var(--umd-red)] transition-colors">
+              <Link href={`/course/${rec.course_id}`} className="text-lg font-bold text-[var(--text-primary)] hover:text-[var(--umd-red)] transition-colors">
                 {rec.course_id}
               </Link>
-              <span className="text-xs font-bold bg-[var(--umd-gold)]/20 text-[var(--umd-black)] px-2.5 py-0.5 rounded-full">
+              <span className="text-xs font-bold bg-[var(--umd-gold)]/20 text-[var(--text-primary)] px-2.5 py-0.5 rounded-full">
                 Score: {pct}
               </span>
             </div>
-            <p className="text-sm text-[var(--umd-gray)] mt-1">{rec.top_reason}</p>
+            <p className="text-sm text-[var(--text-muted)] mt-1">{rec.top_reason}</p>
             <div className="mt-3 flex items-center gap-3">
-              <span className="text-xs text-[var(--umd-gray)]">Confidence</span>
-              <div className="flex-1 max-w-48 h-2 bg-gray-100 rounded-full overflow-hidden">
+              <span className="text-xs text-[var(--text-muted)]">Confidence</span>
+              <div className="flex-1 max-w-48 h-2 bg-[var(--bg-elevated)] rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{
@@ -119,7 +119,7 @@ function RecommendationCard({
                   }}
                 />
               </div>
-              <span className="text-xs font-medium text-[var(--umd-gray)]">{Math.round(rec.confidence * 100)}%</span>
+              <span className="text-xs font-medium text-[var(--text-muted)]">{Math.round(rec.confidence * 100)}%</span>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -128,8 +128,8 @@ function RecommendationCard({
               title={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
               className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors ${
                 wishlisted
-                  ? "border-[var(--umd-gold)]/50 bg-[var(--umd-gold)]/10 text-[var(--umd-black)]"
-                  : "border-black/10 text-[var(--umd-gray)] hover:border-[var(--umd-gold)]/50 hover:text-[var(--umd-black)]"
+                  ? "border-[var(--umd-gold)]/50 bg-[var(--umd-gold)]/10 text-[var(--text-primary)]"
+                  : "border-[var(--border-dark)] text-[var(--text-muted)] hover:border-[var(--umd-gold)]/50 hover:text-[var(--text-primary)]"
               }`}
             >
               <svg className="w-4 h-4" fill={wishlisted ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -142,8 +142,8 @@ function RecommendationCard({
               title={inCart ? "Already in cart" : "Add to cart"}
               className={`w-8 h-8 rounded-lg border flex items-center justify-center transition-colors ${
                 inCart
-                  ? "border-emerald-200 bg-emerald-50 text-emerald-500 cursor-default"
-                  : "border-black/10 text-[var(--umd-gray)] hover:border-[var(--umd-red)]/30 hover:text-[var(--umd-red)]"
+                  ? "border-emerald-200 bg-emerald-500/10 text-emerald-500 cursor-default"
+                  : "border-[var(--border-dark)] text-[var(--text-muted)] hover:border-[var(--umd-red)]/30 hover:text-[var(--umd-red)]"
               }`}
             >
               {inCart ? (
@@ -158,7 +158,7 @@ function RecommendationCard({
             </button>
             <button
               onClick={onToggle}
-              className="w-8 h-8 rounded-lg border border-black/10 flex items-center justify-center text-[var(--umd-gray)] hover:bg-[var(--umd-light)] transition-colors"
+              className="w-8 h-8 rounded-lg border border-[var(--border-dark)] flex items-center justify-center text-[var(--text-muted)] hover:bg-[var(--umd-light)] transition-colors"
             >
               <svg className={`w-4 h-4 transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
@@ -169,22 +169,22 @@ function RecommendationCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-black/5 bg-[var(--umd-light)]/50 p-5">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--umd-gray)] mb-4">Score Breakdown</h4>
+        <div className="border-t border-[var(--border-dark)] bg-[var(--umd-light)]/50 p-5">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)] mb-4">Score Breakdown</h4>
           <div className="space-y-3">
             {rec.explanations.map((exp) => (
               <div key={exp.factor}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-medium text-[var(--umd-black)]">{FACTOR_LABELS[exp.factor] || exp.factor}</span>
-                  <span className="text-xs text-[var(--umd-gray)]">{Math.round(exp.score * 100)} / 100</span>
+                  <span className="text-xs font-medium text-[var(--text-primary)]">{FACTOR_LABELS[exp.factor] || exp.factor}</span>
+                  <span className="text-xs text-[var(--text-muted)]">{Math.round(exp.score * 100)} / 100</span>
                 </div>
-                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{ width: `${exp.score * 100}%`, backgroundColor: FACTOR_COLORS[exp.factor] || "#888" }}
                   />
                 </div>
-                <p className="text-xs text-[var(--umd-gray)] mt-1">{exp.text}</p>
+                <p className="text-xs text-[var(--text-muted)] mt-1">{exp.text}</p>
               </div>
             ))}
           </div>
@@ -405,8 +405,8 @@ function RecommendationsPageInner() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[var(--umd-black)]">Course Recommendations</h1>
-        <p className="text-sm text-[var(--umd-gray)] mt-1">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Course Recommendations</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-1">
           Personalized picks based on your degree progress, preferences, and peer data.
         </p>
       </div>
@@ -415,8 +415,8 @@ function RecommendationsPageInner() {
         {/* Sidebar */}
         <div className="lg:col-span-1 space-y-6">
           {/* Scoring Weights */}
-          <div className="bg-white rounded-2xl p-5 border border-black/5 shadow-sm">
-            <h3 className="text-sm font-bold text-[var(--umd-black)] mb-4">Scoring Weights</h3>
+          <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-dark)] shadow-sm">
+            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Scoring Weights</h3>
             <div className="space-y-4">
               {Object.entries(FACTOR_LABELS).map(([key, label]) => {
                 const raw = weights[key as keyof WeightConfig];
@@ -424,8 +424,8 @@ function RecommendationsPageInner() {
                 return (
                   <div key={key}>
                     <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs font-medium text-[var(--umd-black)]">{label}</span>
-                      <span className="text-xs font-bold text-[var(--umd-gray)]">{rawPct}%</span>
+                      <span className="text-xs font-medium text-[var(--text-primary)]">{label}</span>
+                      <span className="text-xs font-bold text-[var(--text-muted)]">{rawPct}%</span>
                     </div>
                     <input
                       type="range"
@@ -433,7 +433,7 @@ function RecommendationsPageInner() {
                       max={100}
                       value={rawPct}
                       onChange={(e) => handleWeightChange(key, Number(e.target.value) / 100)}
-                      className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer accent-[var(--umd-red)]"
+                      className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-[var(--umd-red)]"
                     />
                   </div>
                 );
@@ -449,8 +449,8 @@ function RecommendationsPageInner() {
           </div>
 
           {/* Professor filter */}
-          <div className="bg-white rounded-2xl p-5 border border-black/5 shadow-sm">
-            <h3 className="text-sm font-bold text-[var(--umd-black)] mb-4">Professor Filter</h3>
+          <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-dark)] shadow-sm">
+            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Professor Filter</h3>
             <div className="relative">
               <input
                 type="text"
@@ -458,15 +458,15 @@ function RecommendationsPageInner() {
                 onChange={(e) => handleProfSearchChange(e.target.value)}
                 onBlur={() => setTimeout(() => setProfSearchOpen(false), 150)}
                 placeholder="Search professor..."
-                className="w-full px-3 py-2 rounded-lg border border-black/10 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)]"
+                className="w-full px-3 py-2 rounded-lg border border-[var(--border-dark)] text-sm bg-[var(--bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)]"
               />
               {profSearchOpen && profSearchResults.length > 0 && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-black/10 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                <div className="absolute z-10 w-full mt-1 bg-[var(--bg-secondary)] border border-[var(--border-dark)] rounded-lg shadow-lg max-h-48 overflow-y-auto">
                   {profSearchResults.map((p) => (
                     <button
                       key={p.slug}
                       onMouseDown={() => handleSelectProfessor(p)}
-                      className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-[var(--bg-elevated)] transition-colors"
                     >
                       {p.name}
                     </button>
@@ -495,22 +495,22 @@ function RecommendationsPageInner() {
           </div>
 
           {/* Advanced Filters */}
-          <div className="bg-white rounded-2xl border border-black/5 shadow-sm overflow-hidden">
+          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-dark)] shadow-sm overflow-hidden">
             <button
               onClick={() => setFiltersOpen((v) => !v)}
-              className="w-full flex items-center justify-between px-5 py-4 text-sm font-bold text-[var(--umd-black)] hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-between px-5 py-4 text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--bg-elevated)] transition-colors"
             >
               <span>Advanced Filters</span>
-              <span className="text-[var(--umd-gray)] text-xs">{filtersOpen ? "▲" : "▼"}</span>
+              <span className="text-[var(--text-muted)] text-xs">{filtersOpen ? "▲" : "▼"}</span>
             </button>
 
             {filtersOpen && (
-              <div className="px-5 pb-5 space-y-5 border-t border-black/5">
+              <div className="px-5 pb-5 space-y-5 border-t border-[var(--border-dark)]">
                 {/* Min GPA */}
                 <div className="pt-4">
                   <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-medium text-[var(--umd-gray)]">Min GPA</label>
-                    <span className="text-xs font-bold text-[var(--umd-black)]">{minGpa.toFixed(1)}</span>
+                    <label className="text-xs font-medium text-[var(--text-muted)]">Min GPA</label>
+                    <span className="text-xs font-bold text-[var(--text-primary)]">{minGpa.toFixed(1)}</span>
                   </div>
                   <input
                     type="range"
@@ -519,9 +519,9 @@ function RecommendationsPageInner() {
                     step={0.1}
                     value={minGpa}
                     onChange={(e) => setMinGpa(Number(e.target.value))}
-                    className="w-full h-1.5 bg-gray-200 rounded-full appearance-none cursor-pointer accent-[var(--umd-red)]"
+                    className="w-full h-1.5 bg-white/10 rounded-full appearance-none cursor-pointer accent-[var(--umd-red)]"
                   />
-                  <div className="flex justify-between text-[10px] text-[var(--umd-gray)] mt-1">
+                  <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-1">
                     <span>0.0</span>
                     <span>4.0</span>
                   </div>
@@ -529,7 +529,7 @@ function RecommendationsPageInner() {
 
                 {/* Course Level checkboxes */}
                 <div>
-                  <label className="text-xs font-medium text-[var(--umd-gray)] block mb-2">Course Level</label>
+                  <label className="text-xs font-medium text-[var(--text-muted)] block mb-2">Course Level</label>
                   <div className="flex flex-wrap gap-2">
                     {COURSE_LEVELS.map((level) => (
                       <button
@@ -538,7 +538,7 @@ function RecommendationsPageInner() {
                         className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
                           selectedLevels.includes(level)
                             ? "bg-[var(--umd-red)] text-white border-[var(--umd-red)]"
-                            : "bg-white text-[var(--umd-gray)] border-black/10 hover:border-[var(--umd-red)]/40"
+                            : "bg-[var(--bg-secondary)] text-[var(--text-muted)] border-[var(--border-dark)] hover:border-[var(--umd-red)]/40"
                         }`}
                       >
                         {level}s
@@ -549,7 +549,7 @@ function RecommendationsPageInner() {
 
                 {/* Department pills */}
                 <div>
-                  <label className="text-xs font-medium text-[var(--umd-gray)] block mb-2">Department</label>
+                  <label className="text-xs font-medium text-[var(--text-muted)] block mb-2">Department</label>
                   <div className="flex flex-wrap gap-1.5">
                     {UMD_DEPARTMENTS.map((dept) => (
                       <button
@@ -558,7 +558,7 @@ function RecommendationsPageInner() {
                         className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
                           selectedDepartments.includes(dept)
                             ? "bg-[var(--umd-red)] text-white border-[var(--umd-red)]"
-                            : "bg-white text-[var(--umd-gray)] border-black/10 hover:border-[var(--umd-red)]/40"
+                            : "bg-[var(--bg-secondary)] text-[var(--text-muted)] border-[var(--border-dark)] hover:border-[var(--umd-red)]/40"
                         }`}
                       >
                         {dept}
@@ -569,7 +569,7 @@ function RecommendationsPageInner() {
 
                 {/* Preference Tags */}
                 <div>
-                  <label className="text-xs font-medium text-[var(--umd-gray)] block mb-2">Preference Tags</label>
+                  <label className="text-xs font-medium text-[var(--text-muted)] block mb-2">Preference Tags</label>
                   <div className="flex flex-wrap gap-1.5">
                     {ALL_PREFERENCE_TAGS.map((tag) => (
                       <button
@@ -577,8 +577,8 @@ function RecommendationsPageInner() {
                         onClick={() => handleToggleTag(tag)}
                         className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
                           selectedTags.includes(tag)
-                            ? "bg-[var(--umd-gold)] text-[var(--umd-black)] border-[var(--umd-gold)]"
-                            : "bg-white text-[var(--umd-gray)] border-black/10 hover:border-[var(--umd-gold)]/60"
+                            ? "bg-[var(--umd-gold)] text-[var(--text-primary)] border-[var(--umd-gold)]"
+                            : "bg-[var(--bg-secondary)] text-[var(--text-muted)] border-[var(--border-dark)] hover:border-[var(--umd-gold)]/60"
                         }`}
                       >
                         {tag}
@@ -589,26 +589,26 @@ function RecommendationsPageInner() {
 
                 {/* Exclude Courses */}
                 <div>
-                  <label className="text-xs font-medium text-[var(--umd-gray)] block mb-2">Exclude Courses</label>
+                  <label className="text-xs font-medium text-[var(--text-muted)] block mb-2">Exclude Courses</label>
                   <input
                     type="text"
                     value={excludeInput}
                     onChange={(e) => setExcludeInput(e.target.value)}
                     onKeyDown={handleExcludeKeyDown}
                     placeholder="Type course ID and press Enter"
-                    className="w-full px-3 py-2 rounded-lg border border-black/10 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)]"
+                    className="w-full px-3 py-2 rounded-lg border border-[var(--border-dark)] text-xs bg-[var(--bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)]"
                   />
                   {excludedCourses.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       {excludedCourses.map((course) => (
                         <span
                           key={course}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-[var(--umd-gray)] text-xs font-medium"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-elevated)] text-[var(--text-muted)] text-xs font-medium"
                         >
                           {course}
                           <button
                             onClick={() => handleRemoveExcluded(course)}
-                            className="hover:text-[var(--umd-black)] ml-0.5"
+                            className="hover:text-[var(--text-primary)] ml-0.5"
                           >
                             x
                           </button>
@@ -634,8 +634,8 @@ function RecommendationsPageInner() {
         {/* Results */}
         <div className="lg:col-span-3 space-y-4">
           <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-[var(--umd-gray)]">
-              Showing <span className="font-bold text-[var(--umd-black)]">{recommendations.length}</span> recommendations
+            <p className="text-sm text-[var(--text-muted)]">
+              Showing <span className="font-bold text-[var(--text-primary)]">{recommendations.length}</span> recommendations
             </p>
           </div>
 
@@ -649,12 +649,12 @@ function RecommendationsPageInner() {
           {loading && !error && (
             <div className="space-y-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="bg-white rounded-2xl border border-black/5 p-5 animate-pulse">
+                <div key={i} className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-dark)] p-5 animate-pulse">
                   <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-gray-200" />
+                    <div className="w-10 h-10 rounded-xl bg-white/10" />
                     <div className="flex-1 space-y-2">
-                      <div className="h-5 bg-gray-200 rounded w-32" />
-                      <div className="h-3 bg-gray-200 rounded w-64" />
+                      <div className="h-5 bg-white/10 rounded w-32" />
+                      <div className="h-3 bg-white/10 rounded w-64" />
                     </div>
                   </div>
                 </div>
@@ -676,7 +676,7 @@ function RecommendationsPageInner() {
           ))}
 
           {!loading && !error && recommendations.length === 0 && (
-            <div className="text-center py-16 text-[var(--umd-gray)]">
+            <div className="text-center py-16 text-[var(--text-muted)]">
               <p className="text-lg font-medium">No courses match your filters.</p>
               <p className="text-sm mt-1">Try adjusting your filters or weights.</p>
             </div>
@@ -689,7 +689,7 @@ function RecommendationsPageInner() {
 
 export default function RecommendationsPage() {
   return (
-    <Suspense fallback={<div className="p-8 text-gray-400">Loading...</div>}>
+    <Suspense fallback={<div className="p-8 text-white/40">Loading...</div>}>
       <RecommendationsPageInner />
     </Suspense>
   );

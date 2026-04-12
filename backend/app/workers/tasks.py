@@ -27,11 +27,11 @@ def _previous_semester(current: str) -> str:
     """Return the semester code immediately before the given one."""
     year, code = int(current[:4]), current[4:]
     if code == "08":
-        return f"{year}01"
+        return f"{year}01"   # previous = Spring same year
     elif code == "05":
-        return f"{year - 1}08"
+        return f"{year}01"   # previous = Spring same year
     else:
-        return f"{year - 1}08"
+        return f"{year - 1}08"  # previous = Fall last year
 
 logger = logging.getLogger(__name__)
 

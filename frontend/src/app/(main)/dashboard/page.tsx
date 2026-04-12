@@ -10,9 +10,9 @@ import CircularProgress from "@/components/ui/CircularProgress";
 function GpaBadge({ score }: { score: number }) {
   const pct = Math.round(score * 100);
   const color =
-    pct >= 85 ? "bg-emerald-100 text-emerald-700" :
-    pct >= 70 ? "bg-amber-100 text-amber-700" :
-    "bg-red-100 text-red-700";
+    pct >= 85 ? "bg-emerald-500/15 text-emerald-300" :
+    pct >= 70 ? "bg-amber-500/15 text-amber-300" :
+    "bg-red-500/15 text-red-300";
   return (
     <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${color}`}>{pct}</span>
   );
@@ -23,13 +23,13 @@ function LoadingSkeleton() {
     <div className="animate-pulse space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-white rounded-xl p-5 border border-black/5 shadow-sm">
-            <div className="h-3 bg-gray-200 rounded w-24 mb-2" />
-            <div className="h-8 bg-gray-200 rounded w-16" />
+          <div key={i} className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border-dark)] shadow-sm">
+            <div className="h-3 bg-white/10 rounded w-24 mb-2" />
+            <div className="h-8 bg-white/10 rounded w-16" />
           </div>
         ))}
       </div>
-      <div className="h-64 bg-white rounded-2xl border border-black/5" />
+      <div className="h-64 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-dark)]" />
     </div>
   );
 }
@@ -110,8 +110,8 @@ export default function DashboardPage() {
   if (error || !audit) {
     return (
       <div className="text-center py-16">
-        <p className="text-lg font-medium text-[var(--umd-gray)]">Failed to load dashboard</p>
-        <p className="text-sm text-[var(--umd-gray)] mt-1">{error || "Unknown error"}</p>
+        <p className="text-lg font-medium text-[var(--text-muted)]">Failed to load dashboard</p>
+        <p className="text-sm text-[var(--text-muted)] mt-1">{error || "Unknown error"}</p>
         <button onClick={() => window.location.reload()} className="mt-4 px-4 py-2 bg-[var(--umd-red)] text-white rounded-lg text-sm">
           Retry
         </button>
@@ -123,8 +123,8 @@ export default function DashboardPage() {
     <div>
       {/* Page header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[var(--umd-black)]">Dashboard</h1>
-        <p className="text-sm text-[var(--umd-gray)] mt-1">Welcome back. Here is your academic overview.</p>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Dashboard</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-1">Welcome back. Here is your academic overview.</p>
       </div>
 
       {/* Quick stats */}
@@ -135,9 +135,9 @@ export default function DashboardPage() {
           { label: "Courses Remaining", value: audit.total_courses_remaining, accent: true },
           { label: "Est. Semesters Left", value: Math.ceil(Math.max(audit.total_credits_required - audit.total_credits_completed, 0) / 15), accent: false },
         ].map((stat) => (
-          <div key={stat.label} className="bg-white rounded-xl p-5 border border-black/5 shadow-sm">
-            <p className="text-xs font-medium text-[var(--umd-gray)] uppercase tracking-wider">{stat.label}</p>
-            <p className={`text-3xl font-extrabold mt-1 ${stat.accent ? "text-[var(--umd-red)]" : "text-[var(--umd-black)]"}`}>
+          <div key={stat.label} className="bg-[var(--bg-secondary)] rounded-xl p-5 border border-[var(--border-dark)] shadow-sm">
+            <p className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">{stat.label}</p>
+            <p className={`text-3xl font-extrabold mt-1 ${stat.accent ? "text-[var(--umd-red)]" : "text-[var(--text-primary)]"}`}>
               {stat.value}
             </p>
           </div>
@@ -146,9 +146,9 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Degree Progress */}
-        <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm lg:col-span-1">
-          <h2 className="text-base font-bold text-[var(--umd-black)] mb-1">Degree Progress</h2>
-          <p className="text-xs text-[var(--umd-gray)] mb-6">{audit.major}</p>
+        <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 border border-[var(--border-dark)] shadow-sm lg:col-span-1">
+          <h2 className="text-base font-bold text-[var(--text-primary)] mb-1">Degree Progress</h2>
+          <p className="text-xs text-[var(--text-muted)] mb-6">{audit.major}</p>
 
           <div className="flex justify-center mb-8">
             <CircularProgress value={audit.overall_progress_pct} label="Complete" />
@@ -169,8 +169,8 @@ export default function DashboardPage() {
               return (
                 <div key={group.name}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-sm font-medium text-[var(--umd-black)]">{group.name}</span>
-                    <span className="text-xs text-[var(--umd-gray)]">
+                    <span className="text-sm font-medium text-[var(--text-primary)]">{group.name}</span>
+                    <span className="text-xs text-[var(--text-muted)]">
                       {displayNum}/{displayDen}
                     </span>
                   </div>
@@ -180,7 +180,7 @@ export default function DashboardPage() {
                         <div className="flex flex-wrap gap-1">
                           <button
                             onClick={() => handleUlcChange(null)}
-                            className="text-xs px-2 py-0.5 rounded border border-gray-200 text-gray-400 hover:border-red-300"
+                            className="text-xs px-2 py-0.5 rounded border border-[var(--border-dark)] text-white/40 hover:border-red-300"
                           >
                             Clear
                           </button>
@@ -188,7 +188,7 @@ export default function DashboardPage() {
                             <button
                               key={d.prefix}
                               onClick={() => handleUlcChange(d.prefix)}
-                              className={`text-xs px-2 py-0.5 rounded border transition-colors ${ulcPrefix === d.prefix ? "border-[var(--umd-red)] text-[var(--umd-red)] bg-red-50" : "border-gray-200 text-gray-500 hover:border-[var(--umd-red)]/40"}`}
+                              className={`text-xs px-2 py-0.5 rounded border transition-colors ${ulcPrefix === d.prefix ? "border-[var(--umd-red)] text-[var(--umd-red)] bg-red-500/10" : "border-[var(--border-dark)] text-[var(--text-muted)] hover:border-[var(--umd-red)]/40"}`}
                             >
                               {d.label}
                             </button>
@@ -197,7 +197,7 @@ export default function DashboardPage() {
                       ) : (
                         <button
                           onClick={() => setUlcEditing(true)}
-                          className="text-xs text-[var(--umd-gray)] hover:text-[var(--umd-red)] transition-colors"
+                          className="text-xs text-[var(--text-muted)] hover:text-[var(--umd-red)] transition-colors"
                         >
                           {ulcPrefix
                             ? `Discipline: ${ULC_DISCIPLINES.find((d) => d.prefix === ulcPrefix)?.label ?? ulcPrefix} · change`
@@ -206,7 +206,7 @@ export default function DashboardPage() {
                       )}
                     </div>
                   )}
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="h-2 bg-[var(--bg-elevated)] rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-700"
                       style={{
@@ -221,11 +221,11 @@ export default function DashboardPage() {
                         ? group.requirements.filter((r) => r.status === "complete")
                         : group.requirements.filter((r) => r.status !== "complete")
                       ).map((r) => (
-                        <li key={r.name} className="flex items-center gap-1.5 text-xs text-[var(--umd-gray)]">
+                        <li key={r.name} className="flex items-center gap-1.5 text-xs text-[var(--text-muted)]">
                           <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${r.status === "complete" ? "bg-green-500" : r.status === "in_progress" ? "bg-yellow-400" : "bg-gray-300"}`} />
                           {r.name}
                           {r.credits_remaining > 0 && (
-                            <span className="text-gray-400">({r.credits_remaining} cr)</span>
+                            <span className="text-white/40">({r.credits_remaining} cr)</span>
                           )}
                         </li>
                       ))}
@@ -238,11 +238,11 @@ export default function DashboardPage() {
         </div>
 
         {/* Recommended Courses */}
-        <div className="bg-white rounded-2xl p-6 border border-black/5 shadow-sm lg:col-span-2">
+        <div className="bg-[var(--bg-secondary)] rounded-2xl p-6 border border-[var(--border-dark)] shadow-sm lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-base font-bold text-[var(--umd-black)]">Recommended Courses</h2>
-              <p className="text-xs text-[var(--umd-gray)] mt-0.5">Top picks for your next semester</p>
+              <h2 className="text-base font-bold text-[var(--text-primary)]">Recommended Courses</h2>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">Top picks for your next semester</p>
             </div>
             <Link
               href="/recommendations"
@@ -253,7 +253,7 @@ export default function DashboardPage() {
           </div>
 
           {recs.length === 0 ? (
-            <p className="text-sm text-[var(--umd-gray)] py-8 text-center">
+            <p className="text-sm text-[var(--text-muted)] py-8 text-center">
               Add completed courses to get personalized recommendations.
             </p>
           ) : (
@@ -262,30 +262,30 @@ export default function DashboardPage() {
                 <Link
                   key={rec.course_id}
                   href={`/course/${rec.course_id}`}
-                  className="flex items-center gap-4 p-4 rounded-xl border border-black/5 hover:border-[var(--umd-red)]/20 hover:shadow-md transition-all group"
+                  className="flex items-center gap-4 p-4 rounded-xl border border-[var(--border-dark)] hover:border-[var(--umd-red)]/20 hover:shadow-md transition-all group"
                 >
                   <div className="w-8 h-8 rounded-lg bg-[var(--umd-red)]/10 text-[var(--umd-red)] flex items-center justify-center text-sm font-bold shrink-0">
                     {rec.rank}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-[var(--umd-black)] group-hover:text-[var(--umd-red)] transition-colors">
+                      <span className="text-sm font-bold text-[var(--text-primary)] group-hover:text-[var(--umd-red)] transition-colors">
                         {rec.course_id}
                       </span>
                       <GpaBadge score={rec.final_score} />
                     </div>
-                    <p className="text-xs text-[var(--umd-gray)] mt-0.5 truncate">{rec.top_reason}</p>
+                    <p className="text-xs text-[var(--text-muted)] mt-0.5 truncate">{rec.top_reason}</p>
                   </div>
                   <div className="hidden sm:flex flex-col items-end shrink-0">
-                    <span className="text-xs text-[var(--umd-gray)]">Confidence</span>
-                    <div className="w-20 h-1.5 bg-gray-100 rounded-full mt-1 overflow-hidden">
+                    <span className="text-xs text-[var(--text-muted)]">Confidence</span>
+                    <div className="w-20 h-1.5 bg-[var(--bg-elevated)] rounded-full mt-1 overflow-hidden">
                       <div
                         className="h-full bg-[var(--umd-gold)] rounded-full"
                         style={{ width: `${rec.confidence * 100}%` }}
                       />
                     </div>
                   </div>
-                  <svg className="w-4 h-4 text-gray-300 group-hover:text-[var(--umd-red)] transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg className="w-4 h-4 text-white/30 group-hover:text-[var(--umd-red)] transition-colors shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                   </svg>
                 </Link>
@@ -297,14 +297,14 @@ export default function DashboardPage() {
 
       {/* Remaining Courses */}
       {audit.courses_remaining.length > 0 && (
-        <div className="mt-6 bg-white rounded-2xl p-6 border border-black/5 shadow-sm">
-          <h2 className="text-base font-bold text-[var(--umd-black)] mb-4">Courses Remaining</h2>
+        <div className="mt-6 bg-[var(--bg-secondary)] rounded-2xl p-6 border border-[var(--border-dark)] shadow-sm">
+          <h2 className="text-base font-bold text-[var(--text-primary)] mb-4">Courses Remaining</h2>
           <div className="flex flex-wrap gap-2">
             {audit.courses_remaining.map((courseId) => (
               <Link
                 key={courseId}
                 href={`/course/${courseId}`}
-                className="px-3 py-1.5 bg-[var(--umd-light)] border border-black/5 rounded-lg text-sm font-medium text-[var(--umd-gray)] hover:text-[var(--umd-red)] hover:border-[var(--umd-red)]/20 transition-colors"
+                className="px-3 py-1.5 bg-[var(--umd-light)] border border-[var(--border-dark)] rounded-lg text-sm font-medium text-[var(--text-muted)] hover:text-[var(--umd-red)] hover:border-[var(--umd-red)]/20 transition-colors"
               >
                 {courseId}
               </Link>

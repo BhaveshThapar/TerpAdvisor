@@ -55,7 +55,7 @@ export default function MobileBottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[var(--umd-black)] border-t border-white/10 flex md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-30 bg-[var(--bg-primary)] border-t border-[var(--border-dark)] flex md:hidden">
       {navItems.map(({ href, label, Icon }) => {
         const active = pathname === href;
         return (
@@ -67,7 +67,7 @@ export default function MobileBottomNav() {
             }`}
           >
             <Icon active={active} />
-            <span className={`text-[10px] font-medium ${active ? "text-[var(--umd-gold)]" : ""}`}>
+            <span className={`text-[10px] font-medium ${active ? "text-[var(--umd-red)]" : ""}`}>
               {label}
             </span>
           </Link>

@@ -39,7 +39,7 @@ export default function WeightSliders({
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold text-gray-800">
+      <h3 className="text-sm font-semibold text-[var(--text-primary)]">
         Recommendation Weights
       </h3>
       {FACTOR_KEYS.map((key) => {

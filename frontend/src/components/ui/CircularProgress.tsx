@@ -33,8 +33,8 @@ export default function CircularProgress({
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-3xl font-extrabold text-[var(--umd-black)]">{value}%</span>
-        {label && <span className="text-xs text-[var(--umd-gray)]">{label}</span>}
+        <span className="text-3xl font-extrabold text-[var(--text-primary)]">{value}%</span>
+        {label && <span className="text-xs text-[var(--text-muted)]">{label}</span>}
       </div>
     </div>
   );

@@ -10,12 +10,12 @@ import CircularProgress from "@/components/ui/CircularProgress";
 
 function DifficultyBadge({ level }: { level: string }) {
   const colors: Record<string, string> = {
-    Easy: "bg-emerald-100 text-emerald-700",
-    Medium: "bg-amber-100 text-amber-700",
-    Hard: "bg-red-100 text-red-700",
+    Easy: "bg-emerald-500/15 text-emerald-300",
+    Medium: "bg-amber-500/15 text-amber-300",
+    Hard: "bg-red-500/15 text-red-300",
   };
   return (
-    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${colors[level] || "bg-gray-100 text-gray-600"}`}>
+    <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full ${colors[level] || "bg-[var(--bg-elevated)] text-[var(--text-muted)]"}`}>
       {level}
     </span>
   );
@@ -24,8 +24,8 @@ function DifficultyBadge({ level }: { level: string }) {
 
 function ArrowIcon() {
   return (
-    <div className="w-9 h-9 rounded-full bg-white/80 flex items-center justify-center shadow-sm group-hover:bg-white group-hover:shadow-md transition-all">
-      <svg className="w-4 h-4 text-[var(--umd-black)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <div className="w-9 h-9 rounded-full bg-[var(--bg-primary)]/80 flex items-center justify-center shadow-sm group-hover:bg-[var(--bg-secondary)] group-hover:shadow-md transition-all">
+      <svg className="w-4 h-4 text-[var(--text-primary)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
       </svg>
     </div>
@@ -94,7 +94,7 @@ export default function HomePage() {
       {/* Greeting + Stat Badges */}
       <section className="flex flex-col md:flex-row md:items-start md:justify-between gap-6 mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-[var(--umd-black)] tracking-tight">
+          <h1 className="text-3xl font-bold text-[var(--text-primary)] tracking-tight">
             Hello, Terp!
           </h1>
           <p className="text-base text-[var(--text-muted)] mt-1">
@@ -132,7 +132,7 @@ export default function HomePage() {
         <Link href="/recommendations" className="group">
           <div className="bg-[var(--card-beige)] rounded-2xl p-6 h-full flex flex-col justify-between min-h-[200px] transition-all hover:shadow-lg hover:-translate-y-0.5">
             <div>
-              <h3 className="text-base font-semibold text-[var(--umd-black)] mb-1">
+              <h3 className="text-base font-semibold text-[var(--text-primary)] mb-1">
                 Recommendations
               </h3>
               <p className="text-sm text-[var(--text-muted)] leading-relaxed">
@@ -140,7 +140,7 @@ export default function HomePage() {
               </p>
             </div>
             <div className="flex items-end justify-between mt-6">
-              <p className="text-5xl font-bold text-[var(--umd-black)] tracking-tight leading-none">
+              <p className="text-5xl font-bold text-[var(--text-primary)] tracking-tight leading-none">
                 {loading ? "..." : recommendations.length}
               </p>
               <ArrowIcon />
@@ -151,7 +151,7 @@ export default function HomePage() {
         <Link href="/dashboard" className="group">
           <div className="bg-[var(--card-blue)] rounded-2xl p-6 h-full flex flex-col justify-between min-h-[200px] transition-all hover:shadow-lg hover:-translate-y-0.5">
             <div>
-              <h3 className="text-base font-semibold text-[var(--umd-black)] mb-1">
+              <h3 className="text-base font-semibold text-[var(--text-primary)] mb-1">
                 Degree Tracking
               </h3>
               <p className="text-sm text-[var(--text-muted)] leading-relaxed">
@@ -159,7 +159,7 @@ export default function HomePage() {
               </p>
             </div>
             <div className="flex items-end justify-between mt-6">
-              <p className="text-5xl font-bold text-[var(--umd-black)] tracking-tight leading-none">
+              <p className="text-5xl font-bold text-[var(--text-primary)] tracking-tight leading-none">
                 {loading ? "..." : (audit?.courses_remaining?.length ?? 0)}
               </p>
               <ArrowIcon />
@@ -170,7 +170,7 @@ export default function HomePage() {
         <Link href="/schedule" className="group">
           <div className="bg-[var(--card-gray)] rounded-2xl p-6 h-full flex flex-col justify-between min-h-[200px] transition-all hover:shadow-lg hover:-translate-y-0.5">
             <div>
-              <h3 className="text-base font-semibold text-[var(--umd-black)] mb-1">
+              <h3 className="text-base font-semibold text-[var(--text-primary)] mb-1">
                 Schedule Builder
               </h3>
               <p className="text-sm text-[var(--text-muted)] leading-relaxed">
@@ -179,7 +179,7 @@ export default function HomePage() {
             </div>
             <div className="flex items-end justify-between mt-6">
               <div className="flex items-baseline gap-2">
-                <p className="text-5xl font-bold text-[var(--umd-black)] tracking-tight leading-none">
+                <p className="text-5xl font-bold text-[var(--text-primary)] tracking-tight leading-none">
                   {cartCount}
                 </p>
                 <span className="text-sm font-medium text-[var(--text-muted)] mb-1">in cart</span>
@@ -193,10 +193,10 @@ export default function HomePage() {
       {/* Main Content: Recommendations Table + Sidebar Widgets */}
       <section className="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
         {/* Recommendations Table — 2/3 width */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-[var(--border-subtle)] shadow-sm">
+        <div className="lg:col-span-2 bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] shadow-sm">
           <div className="px-6 pt-5 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-              <h2 className="text-base font-semibold text-[var(--umd-black)]">
+              <h2 className="text-base font-semibold text-[var(--text-primary)]">
                 Latest recommendations
               </h2>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
@@ -231,7 +231,7 @@ export default function HomePage() {
                       {dept.slice(0, 2)}
                     </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium text-[var(--umd-black)] truncate">
+                      <p className="text-sm font-medium text-[var(--text-primary)] truncate">
                         {rec.course_id}
                       </p>
                       <p className="text-xs text-[var(--text-muted)] truncate" title={rec.top_reason}>
@@ -248,7 +248,7 @@ export default function HomePage() {
                     <DifficultyBadge level={difficulty} />
                   </div>
                   <div className="col-span-2 text-center">
-                    <span className="text-sm text-[var(--umd-black)] font-medium">
+                    <span className="text-sm text-[var(--text-primary)] font-medium">
                       {(rec.confidence * 5).toFixed(1)}
                     </span>
                     <span className="text-xs text-[var(--text-muted)]"> / 5</span>
@@ -268,12 +268,12 @@ export default function HomePage() {
         {/* Sidebar Widgets — 1/3 width */}
         <div className="flex flex-col gap-5">
           {/* Progress Gauge */}
-          <div className="bg-white rounded-2xl border border-[var(--border-subtle)] shadow-sm p-6">
+          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-[var(--umd-black)]">
+              <h3 className="text-base font-semibold text-[var(--text-primary)]">
                 Your progress
               </h3>
-              <button className="text-[var(--text-muted)] hover:text-[var(--umd-black)] transition-colors">
+              <button className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
                 </svg>
@@ -289,7 +289,7 @@ export default function HomePage() {
             <div className="mt-5 flex gap-2">
               <Link
                 href="/dashboard"
-                className="flex-1 text-center text-sm font-medium py-2.5 rounded-xl border border-[var(--border-subtle)] text-[var(--umd-black)] hover:bg-[var(--card-gray)] transition-colors"
+                className="flex-1 text-center text-sm font-medium py-2.5 rounded-xl border border-[var(--border-subtle)] text-[var(--text-primary)] hover:bg-[var(--card-gray)] transition-colors"
               >
                 View audit
               </Link>
@@ -303,12 +303,12 @@ export default function HomePage() {
           </div>
 
           {/* Top Departments */}
-          <div className="bg-white rounded-2xl border border-[var(--border-subtle)] shadow-sm p-6">
+          <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-subtle)] shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-[var(--umd-black)]">
+              <h3 className="text-base font-semibold text-[var(--text-primary)]">
                 Top departments
               </h3>
-              <button className="text-[var(--text-muted)] hover:text-[var(--umd-black)] transition-colors">
+              <button className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM12.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0zM18.75 12a.75.75 0 11-1.5 0 .75.75 0 011.5 0z" />
                 </svg>
@@ -335,9 +335,9 @@ export default function HomePage() {
                       className="w-2.5 h-2.5 rounded-full"
                       style={{ backgroundColor: dept.color }}
                     />
-                    <span className="text-sm text-[var(--umd-black)]">{dept.name}</span>
+                    <span className="text-sm text-[var(--text-primary)]">{dept.name}</span>
                   </div>
-                  <span className="text-sm font-medium text-[var(--umd-black)]">{dept.pct}%</span>
+                  <span className="text-sm font-medium text-[var(--text-primary)]">{dept.pct}%</span>
                 </div>
               ))}
             </div>
@@ -369,7 +369,7 @@ export default function HomePage() {
         <div className="relative z-10 flex items-center gap-3 flex-shrink-0">
           <Link
             href="/onboarding"
-            className="bg-white text-[var(--accent-blue)] font-semibold text-sm px-6 py-2.5 rounded-xl hover:bg-white/90 transition-colors shadow-md"
+            className="bg-[var(--bg-secondary)] text-[var(--accent-blue)] font-semibold text-sm px-6 py-2.5 rounded-xl hover:bg-[var(--bg-primary)]/90 transition-colors shadow-md"
           >
             Get started
           </Link>

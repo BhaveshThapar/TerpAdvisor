@@ -79,15 +79,15 @@ export default function CalendarView({ sections }: CalendarViewProps) {
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl bg-white shadow-md">
+    <div className="overflow-x-auto rounded-xl bg-[var(--bg-secondary)] shadow-md">
       <div className="min-w-[700px]">
         {/* Day headers */}
-        <div className="grid grid-cols-[60px_repeat(5,1fr)] border-b border-gray-200">
+        <div className="grid grid-cols-[60px_repeat(5,1fr)] border-b border-[var(--border-dark)]">
           <div className="p-2" />
           {DAYS.map((d) => (
             <div
               key={d}
-              className="border-l border-gray-200 p-2 text-center text-sm font-semibold text-gray-700"
+              className="border-l border-[var(--border-dark)] p-2 text-center text-sm font-semibold text-white/80"
             >
               {d}
             </div>
@@ -101,7 +101,7 @@ export default function CalendarView({ sections }: CalendarViewProps) {
             {SLOT_HOURS.map((h) => (
               <div
                 key={h}
-                className="flex items-start justify-end pr-2 text-[11px] text-gray-400"
+                className="flex items-start justify-end pr-2 text-[11px] text-white/40"
                 style={{ height: `${100 / (END_HOUR - START_HOUR)}%` }}
               >
                 {formatHour(h)}
@@ -113,7 +113,7 @@ export default function CalendarView({ sections }: CalendarViewProps) {
           {DAYS.map((_, di) => (
             <div
               key={di}
-              className="relative border-l border-gray-100"
+              className="relative border-l border-[var(--border-dark)]"
               style={{
                 height: `${(END_HOUR - START_HOUR) * 3.5}rem`,
               }}
@@ -122,7 +122,7 @@ export default function CalendarView({ sections }: CalendarViewProps) {
               {SLOT_HOURS.map((h) => (
                 <div
                   key={h}
-                  className="absolute left-0 right-0 border-t border-gray-100"
+                  className="absolute left-0 right-0 border-t border-[var(--border-dark)]"
                   style={{
                     top: `${((h - START_HOUR) / (END_HOUR - START_HOUR)) * 100}%`,
                   }}

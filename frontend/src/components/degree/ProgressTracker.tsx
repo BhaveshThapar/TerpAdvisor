@@ -6,9 +6,9 @@ interface ProgressTrackerProps {
 }
 
 const statusStyles: Record<string, { dot: string; text: string }> = {
-  complete: { dot: "bg-green-500", text: "text-green-700" },
-  in_progress: { dot: "bg-yellow-400", text: "text-yellow-700" },
-  incomplete: { dot: "bg-gray-300", text: "text-gray-500" },
+  complete: { dot: "bg-green-500", text: "text-green-300" },
+  in_progress: { dot: "bg-yellow-400", text: "text-yellow-300" },
+  incomplete: { dot: "bg-gray-300", text: "text-[var(--text-muted)]" },
 };
 
 export default function ProgressTracker({ groups }: ProgressTrackerProps) {
@@ -17,10 +17,10 @@ export default function ProgressTracker({ groups }: ProgressTrackerProps) {
       {groups.map((group) => (
         <div key={group.name}>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-800">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">
               {group.name}
             </h3>
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-[var(--text-muted)]">
               {group.completed_count}/{group.min_required ?? group.total_count} complete
             </span>
           </div>
@@ -41,7 +41,7 @@ export default function ProgressTracker({ groups }: ProgressTrackerProps) {
                       {req.name}
                     </span>
                     {req.credits_remaining > 0 && (
-                      <span className="ml-1 text-xs text-gray-400">
+                      <span className="ml-1 text-xs text-white/40">
                         ({req.credits_remaining} cr remaining)
                       </span>
                     )}

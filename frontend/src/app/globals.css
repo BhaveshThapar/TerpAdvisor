@@ -1,32 +1,54 @@
 @import "tailwindcss";
 
-/* UMD brand colors as CSS variables */
 :root {
-  --umd-red: #e21833;
-  --umd-gold: #ffd200;
-  --umd-black: #1a1a1a;
-  --umd-gray: #4a4a4a;
-  --umd-light: #f5f5f5;
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #242444;
+  --bg-elevated: #2d2d50;
+  --border-dark: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --text-primary: #f5f5f5;
+  --text-muted: #9ca3af;
 
-  /* Digesto-style extended palette */
-  --accent-blue: #2563eb;
-  --accent-blue-light: #3b82f6;
-  --card-beige: #f5f0e8;
-  --card-blue: #dbeafe;
-  --card-gray: #f3f4f6;
-  --text-muted: #6b7280;
-  --border-subtle: rgba(0, 0, 0, 0.05);
+  --umd-red: #e21833;
+  --umd-red-hover: #c41529;
+  --umd-gold: #ffd200;
+  --accent-green: #4ade80;
+
+  /* Legacy aliases kept so older className references still resolve */
+  --umd-black: #0f0f1e;
+  --umd-gray: #9ca3af;
+  --umd-light: #1a1a2e;
+  --accent-blue: #3b82f6;
+  --accent-blue-light: #60a5fa;
+  --card-beige: #242444;
+  --card-blue: #242444;
+  --card-gray: #242444;
+  --text-muted-legacy: #9ca3af;
 }
 
 body {
-  font-family: system-ui, -apple-system, sans-serif;
-  background-color: var(--umd-light);
-  color: var(--umd-black);
+  font-family: system-ui, -apple-system, "Helvetica Neue", sans-serif;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
 }
 
-/* Custom scrollbar */
+h1 {
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+.subtitle {
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+a {
+  color: inherit;
+}
+
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -34,10 +56,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #ccc;
-  border-radius: 3px;
+  background: var(--border-dark);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #999;
+  background: rgba(255, 255, 255, 0.18);
 }

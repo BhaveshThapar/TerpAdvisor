@@ -16,16 +16,16 @@ export default function WishlistPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[var(--umd-black)]">Wishlist</h1>
-        <p className="text-sm text-[var(--umd-gray)] mt-1">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Wishlist</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-1">
           Courses you might want to take later.
         </p>
       </div>
 
       {wishlist.length === 0 ? (
-        <div className="text-center py-20 text-[var(--umd-gray)]">
+        <div className="text-center py-20 text-[var(--text-muted)]">
           <svg
-            className="w-14 h-14 mx-auto mb-4 text-gray-300"
+            className="w-14 h-14 mx-auto mb-4 text-white/30"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -47,10 +47,10 @@ export default function WishlistPage() {
           {wishlist.map((courseId) => (
             <div
               key={courseId}
-              className="bg-white rounded-2xl p-5 border border-black/5 shadow-sm flex flex-col gap-4"
+              className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-dark)] shadow-sm flex flex-col gap-4"
             >
               <div>
-                <p className="text-lg font-bold font-mono text-[var(--umd-black)]">
+                <p className="text-lg font-bold font-mono text-[var(--text-primary)]">
                   {courseId}
                 </p>
               </div>
@@ -63,7 +63,7 @@ export default function WishlistPage() {
                 </button>
                 <button
                   onClick={() => handleRemove(courseId)}
-                  className="flex-1 py-2 rounded-xl border border-black/10 text-sm font-semibold text-[var(--umd-gray)] hover:bg-gray-50 transition-colors"
+                  className="flex-1 py-2 rounded-xl border border-[var(--border-dark)] text-sm font-semibold text-[var(--text-muted)] hover:bg-[var(--bg-elevated)] transition-colors"
                 >
                   Remove
                 </button>

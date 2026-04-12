@@ -8,11 +8,11 @@ import type { MultiSemesterPlan, SemesterPlan } from "@/types";
 
 function SemesterCard({ semester }: { semester: SemesterPlan }) {
   return (
-    <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5">
+    <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-dark)] shadow-sm p-5">
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-sm font-bold text-[var(--umd-black)]">{semester.semester_label}</h3>
-          <p className="text-xs text-[var(--umd-gray)] mt-0.5">Semester {semester.semester_number}</p>
+          <h3 className="text-sm font-bold text-[var(--text-primary)]">{semester.semester_label}</h3>
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">Semester {semester.semester_number}</p>
         </div>
         <span className="text-xs font-semibold bg-[var(--umd-red)]/10 text-[var(--umd-red)] px-2.5 py-1 rounded-full">
           {semester.total_credits} cr
@@ -23,10 +23,10 @@ function SemesterCard({ semester }: { semester: SemesterPlan }) {
           <Link
             key={courseId}
             href={`/course/${courseId}`}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-[var(--umd-light)] hover:bg-gray-100 transition-colors group"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-[var(--umd-light)] hover:bg-[var(--bg-elevated)] transition-colors group"
           >
             <span className="w-2 h-2 rounded-full bg-[var(--umd-red)] shrink-0" />
-            <span className="text-sm font-medium text-[var(--umd-black)] group-hover:text-[var(--umd-red)] transition-colors">
+            <span className="text-sm font-medium text-[var(--text-primary)] group-hover:text-[var(--umd-red)] transition-colors">
               {courseId}
             </span>
           </Link>
@@ -75,20 +75,20 @@ export default function PlanPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-[var(--umd-black)]">Graduation Plan</h1>
-        <p className="text-sm text-[var(--umd-gray)] mt-1">
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Graduation Plan</h1>
+        <p className="text-sm text-[var(--text-muted)] mt-1">
           A semester-by-semester roadmap to graduation, respecting prerequisite ordering.
         </p>
       </div>
 
       {/* Controls */}
-      <div className="bg-white rounded-2xl border border-black/5 shadow-sm p-5 mb-6 flex flex-wrap items-end gap-4">
+      <div className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-dark)] shadow-sm p-5 mb-6 flex flex-wrap items-end gap-4">
         <div>
-          <label className="block text-xs font-semibold text-[var(--umd-gray)] mb-1.5">Max Credits / Semester</label>
+          <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Max Credits / Semester</label>
           <select
             value={maxCredits}
             onChange={(e) => setMaxCredits(Number(e.target.value))}
-            className="text-sm border border-black/10 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/30"
+            className="text-sm border border-[var(--border-dark)] rounded-lg px-3 py-2 bg-[var(--bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/30"
           >
             {[6, 9, 12, 13, 14, 15, 16, 17, 18].map((n) => (
               <option key={n} value={n}>{n} credits</option>
@@ -96,11 +96,11 @@ export default function PlanPage() {
           </select>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-[var(--umd-gray)] mb-1.5">Start Semester</label>
+          <label className="block text-xs font-semibold text-[var(--text-muted)] mb-1.5">Start Semester</label>
           <select
             value={startSemester}
             onChange={(e) => setStartSemester(e.target.value)}
-            className="text-sm border border-black/10 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/30"
+            className="text-sm border border-[var(--border-dark)] rounded-lg px-3 py-2 bg-[var(--bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/30"
           >
             {["Fall 2025", "Spring 2026", "Fall 2026", "Spring 2027", "Fall 2027"].map((s) => (
               <option key={s} value={s}>{s}</option>
@@ -118,19 +118,19 @@ export default function PlanPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-6 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error}</div>
+        <div className="mb-6 px-4 py-3 bg-red-500/10 border border-red-200 rounded-xl text-sm text-red-300">{error}</div>
       )}
 
       {/* Loading skeleton */}
       {loading && !plan && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl border border-black/5 shadow-sm p-5 animate-pulse">
-              <div className="h-4 bg-gray-100 rounded w-1/2 mb-2" />
-              <div className="h-3 bg-gray-100 rounded w-1/4 mb-4" />
+            <div key={i} className="bg-[var(--bg-secondary)] rounded-2xl border border-[var(--border-dark)] shadow-sm p-5 animate-pulse">
+              <div className="h-4 bg-[var(--bg-elevated)] rounded w-1/2 mb-2" />
+              <div className="h-3 bg-[var(--bg-elevated)] rounded w-1/4 mb-4" />
               <div className="space-y-2">
                 {Array.from({ length: 4 }).map((_, j) => (
-                  <div key={j} className="h-8 bg-gray-100 rounded-lg" />
+                  <div key={j} className="h-8 bg-[var(--bg-elevated)] rounded-lg" />
                 ))}
               </div>
             </div>
@@ -143,29 +143,29 @@ export default function PlanPage() {
         <>
           {/* Summary bar */}
           <div className="flex flex-wrap gap-4 mb-6">
-            <div className="bg-white rounded-xl border border-black/5 shadow-sm px-4 py-3 text-center min-w-[100px]">
+            <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-dark)] shadow-sm px-4 py-3 text-center min-w-[100px]">
               <p className="text-2xl font-bold text-[var(--umd-red)]">{plan.total_semesters}</p>
-              <p className="text-xs text-[var(--umd-gray)] mt-0.5">Semesters</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">Semesters</p>
             </div>
-            <div className="bg-white rounded-xl border border-black/5 shadow-sm px-4 py-3 text-center min-w-[100px]">
-              <p className="text-2xl font-bold text-[var(--umd-black)]">{plan.total_credits}</p>
-              <p className="text-xs text-[var(--umd-gray)] mt-0.5">Credits</p>
+            <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-dark)] shadow-sm px-4 py-3 text-center min-w-[100px]">
+              <p className="text-2xl font-bold text-[var(--text-primary)]">{plan.total_credits}</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">Credits</p>
             </div>
-            <div className="bg-white rounded-xl border border-black/5 shadow-sm px-4 py-3 text-center min-w-[100px]">
-              <p className="text-2xl font-bold text-[var(--umd-black)]">
+            <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border-dark)] shadow-sm px-4 py-3 text-center min-w-[100px]">
+              <p className="text-2xl font-bold text-[var(--text-primary)]">
                 {plan.semesters.reduce((s, sem) => s + sem.courses.length, 0)}
               </p>
-              <p className="text-xs text-[var(--umd-gray)] mt-0.5">Courses</p>
+              <p className="text-xs text-[var(--text-muted)] mt-0.5">Courses</p>
             </div>
           </div>
 
           {/* Warnings */}
           {plan.warnings.length > 0 && (
-            <div className="mb-6 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl">
-              <p className="text-xs font-bold text-amber-700 mb-1">Scheduling Notes</p>
+            <div className="mb-6 px-4 py-3 bg-amber-500/10 border border-amber-200 rounded-xl">
+              <p className="text-xs font-bold text-amber-300 mb-1">Scheduling Notes</p>
               <ul className="space-y-1">
                 {plan.warnings.map((w, i) => (
-                  <li key={i} className="text-xs text-amber-700">• {w}</li>
+                  <li key={i} className="text-xs text-amber-300">• {w}</li>
                 ))}
               </ul>
             </div>
