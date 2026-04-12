@@ -29,7 +29,9 @@
       "WebFetch(domain:undergrad.cs.umd.edu)",
       "WebFetch(domain:academiccatalog.umd.edu)",
       "WebFetch(domain:gened.umd.edu)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(python3 -m pytest --collect-only -q tests/)",
+      "Bash(pip3 install:*)"
     ]
   }
 }
