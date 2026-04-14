@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -121,6 +123,7 @@ class RecommendationRequest(BaseModel):
     weight_overrides: dict[str, float] | None = None
     filters: RecommendationFilters | None = None
     preference_tags: list[str] | None = None  # e.g., ["project-based", "no-final-exam"]
+    goal: Literal["balanced", "easiest"] = "balanced"
     top_n: int = 20
 
 

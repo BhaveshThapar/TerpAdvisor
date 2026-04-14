@@ -17,6 +17,9 @@ TAG_KEYWORDS: dict[str, list[str]] = {
     "good-lectures": ["great lectures", "good lecturer", "engaging", "interesting lectures", "clear explanations"],
     "writing-intensive": ["writing", "essays", "papers", "write a lot", "research paper"],
     "math-heavy": ["math", "proofs", "mathematical", "calculus", "equations"],
+    "online": ["online", "asynchronous", "async", "recorded lectures", "fully online", "remote", "zoom"],
+    "no-attendance": ["no attendance", "attendance not required", "don't need to go", "skip class", "never went", "didn't go to class", "never attended"],
+    "easy-a": ["easy a", "easy class", "generous curve", "free a", "gpa booster", "boost your gpa", "easiest"],
 }
 
 

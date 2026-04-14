@@ -329,7 +329,14 @@ async def _build_scoring_context(
     if available:
         result = await db.execute(select(Course).where(Course.course_id.in_(available)))
         for c in result.scalars().all():
-            course_data[c.course_id] = {"avg_gpa": c.avg_gpa, "sections": [], "professors": []}
+            course_data[c.course_id] = {
+                "avg_gpa": c.avg_gpa,
+                "department": c.department,
+                "credits": c.credits,
+                "gen_eds": c.gen_eds or [],
+                "sections": [],
+                "professors": [],
+            }
 
     # Fetch professor data
     professor_data = {}
@@ -367,13 +374,19 @@ async def _build_scoring_context(
 
 
 def _apply_filters(
-    available: list[str], filters: RecommendationFilters | None, course_data: dict,
+    available: list[str],
+    filters: RecommendationFilters | None,
+    course_data: dict,
+    allowed_by_prof: set[str] | None = None,
+    excluded_by_prof: set[str] | None = None,
 ) -> list[str]:
     """Apply user-specified filters to the candidate course list."""
-    if not filters:
+    if not filters and not allowed_by_prof and not excluded_by_prof:
         return available
 
     filtered = available
+    if filters is None:
+        filters = RecommendationFilters()
     
     # Department filter
     if filters.departments:
@@ -413,7 +426,13 @@ def _apply_filters(
     if filters.exclude_courses:
         excluded = {e.upper() for e in filters.exclude_courses}
         filtered = [c for c in filtered if c.upper() not in excluded]
-        
+
+    # Professor filters (resolved to course-id sets by caller)
+    if allowed_by_prof is not None:
+        filtered = [c for c in filtered if c in allowed_by_prof]
+    if excluded_by_prof:
+        filtered = [c for c in filtered if c not in excluded_by_prof]
+
     return filtered
 
 
@@ -428,7 +447,11 @@ async def get_recommendations(body: RecommendationRequest, db: AsyncSession = De
     requirements = build_requirements_for_major(major)
     auditor = DegreeAuditor(requirements)
 
-    available = graph.get_available_courses(completed)
+    if body.goal == "easiest":
+        catalog_result = await db.execute(select(Course.course_id))
+        available = [cid for cid in catalog_result.scalars().all() if cid not in completed]
+    else:
+        available = graph.get_available_courses(completed)
 
     # Load course metadata for filtering
     if available:
@@ -443,14 +466,77 @@ async def get_recommendations(body: RecommendationRequest, db: AsyncSession = De
     else:
         course_meta = {}
 
-    available = _apply_filters(available, body.filters, course_meta)
+    unmet_gened_codes: set[str] = set()
+    if body.goal == "easiest":
+        audit_result = auditor.audit(
+            completed_credits,
+            course_gen_eds={cid: meta.get("gen_eds") or [] for cid, meta in course_meta.items()},
+        )
+        for group in audit_result.group_results:
+            for req_result in group.results:
+                req = req_result.requirement
+                if req.type.value != "gened":
+                    continue
+                if req_result.status.value == "complete":
+                    continue
+                for code in req.id.split("_")[1:]:
+                    unmet_gened_codes.add(code.upper())
+
+        if unmet_gened_codes:
+            narrowed = [
+                cid for cid in available
+                if unmet_gened_codes & {g.upper() for g in (course_meta.get(cid, {}).get("gen_eds") or [])}
+            ]
+            if narrowed:
+                available = narrowed
+            else:
+                # No seeded courses carry gen_eds tags — fall back to full catalog
+                # so users still see results, and clear unmet codes so the weight
+                # tuning below doesn't over-boost the requirement scorer.
+                unmet_gened_codes = set()
+
+    allowed_by_prof: set[str] | None = None
+    excluded_by_prof: set[str] = set()
+    if body.filters and (body.filters.include_professors or body.filters.exclude_professors):
+        slugs = list({*(body.filters.include_professors or []), *(body.filters.exclude_professors or [])})
+        prof_rows = await db.execute(select(Professor).where(Professor.slug.in_(slugs)))
+        prof_courses = {p.slug: (p.courses_taught or []) for p in prof_rows.scalars().all()}
+        if body.filters.include_professors:
+            allowed_by_prof = set()
+            for s in body.filters.include_professors:
+                allowed_by_prof.update(prof_courses.get(s, []))
+        for s in (body.filters.exclude_professors or []):
+            excluded_by_prof.update(prof_courses.get(s, []))
+
+    available = _apply_filters(available, body.filters, course_meta, allowed_by_prof, excluded_by_prof)
 
     impact_courses = auditor.get_highest_impact_courses(completed_credits, available)
     requirement_impact = dict(impact_courses)
 
+    weight_overrides = dict(body.weight_overrides or {})
+    preference_tags = body.preference_tags
+    if body.goal == "easiest":
+        if not preference_tags:
+            preference_tags = ["online", "no-attendance", "no-final-exam", "light-workload", "easy-a"]
+        easiest_defaults: dict[str, float] = {
+            "gpa": 0.50,
+            "preference_tags": 0.30,
+            "sentiment": 0.10,
+            "requirement": 0.05,
+            "professor": 0.05,
+            "collaborative": 0.0,
+            "schedule_fit": 0.0,
+        }
+        if unmet_gened_codes:
+            # Shift weight back toward requirement fit so GenEd-fulfilling picks win.
+            easiest_defaults["requirement"] = 0.20
+            easiest_defaults["gpa"] = 0.40
+        for k, v in easiest_defaults.items():
+            weight_overrides.setdefault(k, v)
+
     context = await _build_scoring_context(
-        db, available, completed, major, requirement_impact, body.weight_overrides,
-        preference_tags=body.preference_tags,
+        db, available, completed, major, requirement_impact, weight_overrides,
+        preference_tags=preference_tags,
     )
 
     result = await _engine.recommend(available, context, body.top_n)

@@ -5,6 +5,7 @@ import pytest
 from app.engine.recommender import RecommendationEngine
 from app.engine.scorers.base import ScoringContext
 from app.engine.scorers.gpa import GPAScorer
+from app.engine.scorers.preference_tags import PreferenceTagScorer
 from app.engine.scorers.requirement import RequirementScorer
 
 
@@ -56,6 +57,51 @@ class TestGPAScorer:
         result = await scorer.score("CMSC389", context)
         assert result.score == 0.5
         assert result.confidence < 0.5
+
+
+class TestPreferenceTagScorer:
+    @pytest.mark.asyncio
+    async def test_online_keywords_match(self):
+        scorer = PreferenceTagScorer()
+        context = _make_context(
+            review_data={
+                "HIST200": [
+                    {"rating": 4, "text": "This class is fully online and asynchronous, recorded lectures every week."},
+                ]
+            },
+            preference_tags=["online"],
+        )
+        result = await scorer.score("HIST200", context)
+        assert result.score > 0.5
+        assert "online" in result.explanation
+
+    @pytest.mark.asyncio
+    async def test_no_attendance_and_easy_a_match(self):
+        scorer = PreferenceTagScorer()
+        context = _make_context(
+            review_data={
+                "PSYC100": [
+                    {"rating": 5, "text": "Easy A and attendance not required, I never went to class."},
+                ]
+            },
+            preference_tags=["easy-a", "no-attendance"],
+        )
+        result = await scorer.score("PSYC100", context)
+        assert result.score >= 0.9
+
+    @pytest.mark.asyncio
+    async def test_unmatched_reviews_score_low(self):
+        scorer = PreferenceTagScorer()
+        context = _make_context(
+            review_data={
+                "MATH410": [
+                    {"rating": 3, "text": "Proof-heavy and in-person with strict attendance."},
+                ]
+            },
+            preference_tags=["online", "easy-a"],
+        )
+        result = await scorer.score("MATH410", context)
+        assert result.score <= 0.35
 
 
 class TestRequirementScorer:
@@ -131,6 +177,39 @@ class TestRecommendationEngine:
         # Explanations should be sorted by contribution
         contributions = [e.contribution for e in rec.explanations]
         assert contributions == sorted(contributions, reverse=True)
+
+    @pytest.mark.asyncio
+    async def test_easiest_mode_weights_rank_high_gpa_online_course_first(self):
+        """Easiest-mode weight overrides should float a high-GPA, 'online'-reviewed course to the top."""
+        engine = RecommendationEngine()
+        context = _make_context(
+            course_data={
+                "EASY200": {"avg_gpa": 3.85},
+                "TOUGH400": {"avg_gpa": 2.4},
+            },
+            review_data={
+                "EASY200": [
+                    {"rating": 5, "text": "Fully online asynchronous course, no final exam, easy A."},
+                ],
+                "TOUGH400": [
+                    {"rating": 2, "text": "Hard proofs and attendance is strictly enforced."},
+                ],
+            },
+            requirement_impact={"TOUGH400": 3, "EASY200": 0},
+            preference_tags=["online", "no-attendance", "no-final-exam", "light-workload", "easy-a"],
+            weight_overrides={
+                "gpa": 0.50,
+                "preference_tags": 0.30,
+                "sentiment": 0.10,
+                "requirement": 0.05,
+                "professor": 0.05,
+                "collaborative": 0.0,
+                "schedule_fit": 0.0,
+            },
+        )
+        result = await engine.recommend(["EASY200", "TOUGH400"], context, top_n=2)
+        assert result.recommendations[0].course_id == "EASY200"
+        assert result.weights_used["gpa"] >= 0.4
 
     @pytest.mark.asyncio
     async def test_weights_normalize_to_one(self):
