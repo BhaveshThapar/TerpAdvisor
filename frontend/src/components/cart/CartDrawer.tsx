@@ -29,7 +29,7 @@ export default function CartDrawer({ isOpen, onClose }: { isOpen: boolean; onClo
       <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-80 bg-[var(--bg-secondary)] z-50 shadow-2xl flex flex-col">
+      <div className="fixed right-0 top-0 h-[100dvh] w-full sm:w-96 max-w-full bg-[var(--bg-secondary)] z-50 shadow-2xl flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b">
           <div className="flex items-center gap-2">

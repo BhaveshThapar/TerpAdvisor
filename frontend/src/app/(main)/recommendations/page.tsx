@@ -38,6 +38,10 @@ const ALL_PREFERENCE_TAGS = [
   "discussion-heavy",
   "writing-intensive",
   "lab-required",
+  "online",
+  "no-attendance",
+  "easy-a",
+  "light-workload",
 ];
 
 const COURSE_LEVELS = [100, 200, 300, 400];
@@ -227,6 +231,7 @@ function RecommendationsPageInner() {
   const [excludedCourses, setExcludedCourses] = useState<string[]>([]);
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
+  const [goal, setGoal] = useState<"balanced" | "easiest">("balanced");
 
   // Load preferences from local store on mount
   useEffect(() => {
@@ -309,7 +314,7 @@ function RecommendationsPageInner() {
     if (minGpa > 0) filters.min_gpa = minGpa;
     if (excludedCourses.length > 0) filters.exclude_courses = excludedCourses;
     if (selectedProfessors.length > 0) {
-      filters.exclude_professors = [];
+      filters.include_professors = selectedProfessors.map((p) => p.slug);
     }
     return Object.keys(filters).length > 0 ? filters : null;
   }
@@ -322,7 +327,7 @@ function RecommendationsPageInner() {
       const major = getState().major;
       const track = getState().track || "General";
       const filters = buildApiFilters();
-      const data = await recommendationApi.get(completedIds, major, track, w, 20, selectedTags.length > 0 ? selectedTags : undefined, filters ?? undefined);
+      const data = await recommendationApi.get(completedIds, major, track, w, 20, selectedTags.length > 0 ? selectedTags : undefined, filters ?? undefined, goal);
       setRecommendations(data.recommendations);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to fetch recommendations");
@@ -330,7 +335,7 @@ function RecommendationsPageInner() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTags, selectedDepartments, selectedLevels, minGpa, excludedCourses]);
+  }, [selectedTags, selectedDepartments, selectedLevels, minGpa, excludedCourses, selectedProfessors, goal]);
 
   useEffect(() => {
     fetchRecs(weights);
@@ -346,7 +351,7 @@ function RecommendationsPageInner() {
     if (filterDebounceRef.current) clearTimeout(filterDebounceRef.current);
     filterDebounceRef.current = setTimeout(() => fetchRecs(weights), 400);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [minGpa, selectedDepartments, selectedLevels, selectedTags, excludedCourses]);
+  }, [minGpa, selectedDepartments, selectedLevels, selectedTags, excludedCourses, selectedProfessors, goal]);
 
   const handleWeightChange = (factor: string, value: number) => {
     const next = { ...weights, [factor]: value };
@@ -414,6 +419,32 @@ function RecommendationsPageInner() {
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Sidebar */}
         <div className="lg:col-span-1 space-y-6">
+          {/* Goal selector */}
+          <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-dark)] shadow-sm">
+            <h3 className="text-sm font-bold text-[var(--text-primary)] mb-3">Goal</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setGoal("balanced")}
+                className={`py-2 rounded-lg text-xs font-semibold transition-colors ${goal === "balanced" ? "bg-[var(--umd-red)] text-white" : "bg-white/5 text-[var(--text-primary)] hover:bg-white/10"}`}
+              >
+                Balanced
+              </button>
+              <button
+                type="button"
+                onClick={() => setGoal("easiest")}
+                className={`py-2 rounded-lg text-xs font-semibold transition-colors ${goal === "easiest" ? "bg-[var(--umd-red)] text-white" : "bg-white/5 text-[var(--text-primary)] hover:bg-white/10"}`}
+              >
+                Easiest Classes
+              </button>
+            </div>
+            {goal === "easiest" && (
+              <p className="text-[11px] text-[var(--text-muted)] mt-3 leading-snug">
+                Pulls from the full UMD catalog and ranks by high average GPA and reviews mentioning online, async, no attendance, or no exams. If any GenEds are still unmet, results narrow to courses that fulfill them.
+              </p>
+            )}
+          </div>
+
           {/* Scoring Weights */}
           <div className="bg-[var(--bg-secondary)] rounded-2xl p-5 border border-[var(--border-dark)] shadow-sm">
             <h3 className="text-sm font-bold text-[var(--text-primary)] mb-4">Scoring Weights</h3>
@@ -442,7 +473,7 @@ function RecommendationsPageInner() {
             <button
               onClick={handleApplyWeights}
               disabled={loading}
-              className="mt-5 w-full py-2 rounded-lg bg-[var(--umd-red)] text-white text-sm font-semibold hover:bg-[var(--umd-red)]/90 transition-colors disabled:opacity-50"
+              className="mt-5 w-full py-2 rounded-lg bg-[var(--umd-red)] text-white text-sm font-semibold hover:bg-[var(--umd-red)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Loading..." : "Apply Weights"}
             </button>

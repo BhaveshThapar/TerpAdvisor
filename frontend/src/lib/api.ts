@@ -70,6 +70,7 @@ export const recommendationApi = {
     topN = 20,
     preferenceTags?: string[],
     filters?: UserPreferences["filters"],
+    goal: "balanced" | "easiest" = "balanced",
   ) =>
     fetchApi<RecommendationList>("/recommendations", {
       method: "POST",
@@ -81,6 +82,7 @@ export const recommendationApi = {
         top_n: topN,
         preference_tags: preferenceTags,
         filters: filters,
+        goal,
       }),
     }),
 };

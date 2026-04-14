@@ -228,6 +228,7 @@ export interface UserPreferences {
     min_gpa?: number;
     exclude_courses?: string[];
     exclude_professors?: string[];
+    include_professors?: string[];
   } | null;
   schedule_preferences: {
     no_before?: string;

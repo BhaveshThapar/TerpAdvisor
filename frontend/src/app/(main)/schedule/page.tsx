@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import type { ScheduleResult, ScheduleSection, ScheduleMeeting } from "@/types";
 import { scheduleApi, auditApi } from "@/lib/api";
@@ -133,7 +133,7 @@ function LoadingSkeleton() {
 function SchedulePageInner() {
   const searchParams = useSearchParams();
   const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
-  const [availableCourses, setAvailableCourses] = useState<{ id: string; name: string; credits: number }[]>([]);
+  const [availableCourses, setAvailableCourses] = useState<{ id: string; name: string; credits: number; fromCart?: boolean }[]>([]);
   const [noBefore, setNoBefore] = useState<string>("");
   const [noAfter, setNoAfter] = useState<string>("");
   const [dayPref, setDayPref] = useState<string>("balanced");
@@ -145,57 +145,52 @@ function SchedulePageInner() {
   const [loadingCourses, setLoadingCourses] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generated, setGenerated] = useState(false);
-  const cartCoursesApplied = useRef(false);
 
-  // Fetch available courses from audit (remaining courses)
+  const cartParamString = searchParams.get("courses") ?? "";
+
   useEffect(() => {
     async function loadCourses() {
+      const cartIds: string[] = cartParamString
+        ? cartParamString.split(",").map((id) => id.trim()).filter(Boolean)
+        : (getState().cart ?? []);
+      const cartSet = new Set(cartIds);
+
       try {
         const completedIds = getCompletedCourseIds();
         const major = getState().major;
         const track = getState().track || "General";
         const audit = await auditApi.get(completedIds, major, track);
-        const courses = audit.courses_remaining.map((courseId) => ({
+        const auditCourses = audit.courses_remaining.map((courseId) => ({
           id: courseId,
           name: courseId,
           credits: 3,
+          fromCart: cartSet.has(courseId),
         }));
-        setAvailableCourses(courses);
 
-        // Pre-select courses from the ?courses query param (CartDrawer navigation)
-        // OR fall back to the current cart contents when navigating directly.
-        const cartParam = searchParams.get("courses");
-        const cartIds: string[] = cartParam
-          ? cartParam.split(",").map((id) => id.trim()).filter(Boolean)
-          : (getState().cart ?? []);
+        const auditIdSet = new Set(auditCourses.map((c) => c.id));
+        const extraCartCourses = cartIds
+          .filter((id) => !auditIdSet.has(id))
+          .map((id) => ({ id, name: id, credits: 3, fromCart: true }));
 
-        if (cartIds.length > 0 && !cartCoursesApplied.current) {
-          cartCoursesApplied.current = true;
-          // Merge cart courses with audit courses so they appear in the selector
-          const auditIds = new Set(courses.map((c) => c.id));
-          const extraCourses = cartIds
-            .filter((id) => !auditIds.has(id))
-            .map((id) => ({ id, name: id, credits: 3 }));
-          setAvailableCourses([...courses, ...extraCourses]);
+        const cartFirst = auditCourses.filter((c) => c.fromCart);
+        const nonCart = auditCourses.filter((c) => !c.fromCart);
+        setAvailableCourses([...extraCartCourses, ...cartFirst, ...nonCart]);
+
+        if (cartIds.length > 0) {
           setSelectedCourses(cartIds);
         }
       } catch {
-        // If audit fails, fall back to cart contents
-        const cartParam = searchParams.get("courses");
-        const fallbackIds: string[] = cartParam
-          ? cartParam.split(",").map((id) => id.trim()).filter(Boolean)
-          : (getState().cart ?? []);
-        if (fallbackIds.length > 0) {
-          const fallbackCourses = fallbackIds.map((id) => ({ id, name: id, credits: 3 }));
+        if (cartIds.length > 0) {
+          const fallbackCourses = cartIds.map((id) => ({ id, name: id, credits: 3, fromCart: true }));
           setAvailableCourses(fallbackCourses);
-          setSelectedCourses(fallbackIds);
+          setSelectedCourses(cartIds);
         }
       } finally {
         setLoadingCourses(false);
       }
     }
     loadCourses();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cartParamString]);
 
   // Load schedule preferences from local store
   useEffect(() => {
@@ -279,8 +274,13 @@ function SchedulePageInner() {
                       onChange={() => toggleCourse(course.id)}
                       className="w-4 h-4 rounded accent-[var(--umd-red)]"
                     />
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
                       <p className="text-sm font-medium text-[var(--text-primary)] truncate">{course.id}</p>
+                      {course.fromCart && (
+                        <span className="text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--umd-red)]/15 text-[var(--umd-red)] shrink-0">
+                          Cart
+                        </span>
+                      )}
                     </div>
                   </label>
                 ))}

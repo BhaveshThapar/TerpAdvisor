@@ -31,7 +31,8 @@
       "WebFetch(domain:gened.umd.edu)",
       "WebSearch",
       "Bash(python3 -m pytest --collect-only -q tests/)",
-      "Bash(pip3 install:*)"
+      "Bash(pip3 install:*)",
+      "mcp__Neon__run_sql"
     ]
   }
 }
