@@ -112,6 +112,18 @@ function RecommendationCard({
               </span>
             </div>
             <p className="text-sm text-[var(--text-muted)] mt-1">{rec.top_reason}</p>
+            {rec.fulfills_requirements.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {rec.fulfills_requirements.map((groupId) => (
+                  <span
+                    key={groupId}
+                    className="inline-flex items-center px-2 py-0.5 rounded-full bg-[var(--umd-red)]/10 text-[var(--umd-red)] text-[10px] font-semibold uppercase tracking-wide"
+                  >
+                    {groupId.replace(/_/g, " ")}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="mt-3 flex items-center gap-3">
               <span className="text-xs text-[var(--text-muted)]">Confidence</span>
               <div className="flex-1 max-w-48 h-2 bg-[var(--bg-elevated)] rounded-full overflow-hidden">
@@ -232,6 +244,7 @@ function RecommendationsPageInner() {
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [savedNotice, setSavedNotice] = useState(false);
   const [goal, setGoal] = useState<"balanced" | "easiest">("balanced");
+  const [showPrereqOnly, setShowPrereqOnly] = useState(false);
 
   // Load preferences from local store on mount
   useEffect(() => {
@@ -327,7 +340,7 @@ function RecommendationsPageInner() {
       const major = getState().major;
       const track = getState().track || "General";
       const filters = buildApiFilters();
-      const data = await recommendationApi.get(completedIds, major, track, w, 20, selectedTags.length > 0 ? selectedTags : undefined, filters ?? undefined, goal);
+      const data = await recommendationApi.get(completedIds, major, track, w, 20, selectedTags.length > 0 ? selectedTags : undefined, filters ?? undefined, goal, showPrereqOnly);
       setRecommendations(data.recommendations);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to fetch recommendations");
@@ -335,7 +348,7 @@ function RecommendationsPageInner() {
       setLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTags, selectedDepartments, selectedLevels, minGpa, excludedCourses, selectedProfessors, goal]);
+  }, [selectedTags, selectedDepartments, selectedLevels, minGpa, excludedCourses, selectedProfessors, goal, showPrereqOnly]);
 
   useEffect(() => {
     fetchRecs(weights);
@@ -351,7 +364,7 @@ function RecommendationsPageInner() {
     if (filterDebounceRef.current) clearTimeout(filterDebounceRef.current);
     filterDebounceRef.current = setTimeout(() => fetchRecs(weights), 400);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [minGpa, selectedDepartments, selectedLevels, selectedTags, excludedCourses, selectedProfessors, goal]);
+  }, [minGpa, selectedDepartments, selectedLevels, selectedTags, excludedCourses, selectedProfessors, goal, showPrereqOnly]);
 
   const handleWeightChange = (factor: string, value: number) => {
     const next = { ...weights, [factor]: value };
@@ -443,6 +456,17 @@ function RecommendationsPageInner() {
                 Pulls from the full UMD catalog and ranks by high average GPA and reviews mentioning online, async, no attendance, or no exams. If any GenEds are still unmet, results narrow to courses that fulfill them.
               </p>
             )}
+            <label className="mt-4 flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showPrereqOnly}
+                onChange={(e) => setShowPrereqOnly(e.target.checked)}
+                className="w-4 h-4 rounded accent-[var(--umd-red)] cursor-pointer"
+              />
+              <span className="text-xs font-medium text-[var(--text-primary)]">
+                Only courses I can take now
+              </span>
+            </label>
           </div>
 
           {/* Scoring Weights */}
@@ -693,18 +717,42 @@ function RecommendationsPageInner() {
             </div>
           )}
 
-          {!loading && recommendations.map((rec) => (
-            <RecommendationCard
-              key={rec.course_id}
-              rec={rec}
-              expanded={expandedId === rec.course_id}
-              onToggle={() => setExpandedId(expandedId === rec.course_id ? null : rec.course_id)}
-              inCart={cartIds.has(rec.course_id)}
-              onAddToCart={handleAddToCart}
-              wishlisted={wishlistIds.has(rec.course_id)}
-              onToggleWishlist={handleToggleWishlist}
-            />
-          ))}
+          {!loading && (() => {
+            const major = recommendations.filter((r) => r.section === "major_requirement");
+            const other = recommendations.filter((r) => r.section === "other_course");
+            const renderCard = (rec: Recommendation) => (
+              <RecommendationCard
+                key={rec.course_id}
+                rec={rec}
+                expanded={expandedId === rec.course_id}
+                onToggle={() => setExpandedId(expandedId === rec.course_id ? null : rec.course_id)}
+                inCart={cartIds.has(rec.course_id)}
+                onAddToCart={handleAddToCart}
+                wishlisted={wishlistIds.has(rec.course_id)}
+                onToggleWishlist={handleToggleWishlist}
+              />
+            );
+            return (
+              <>
+                {major.length > 0 && (
+                  <div className="space-y-4">
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      Major Requirements ({major.length})
+                    </h2>
+                    {major.map(renderCard)}
+                  </div>
+                )}
+                {other.length > 0 && (
+                  <div className="space-y-4 mt-6">
+                    <h2 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
+                      Other Courses ({other.length})
+                    </h2>
+                    {other.map(renderCard)}
+                  </div>
+                )}
+              </>
+            );
+          })()}
 
           {!loading && !error && recommendations.length === 0 && (
             <div className="text-center py-16 text-[var(--text-muted)]">

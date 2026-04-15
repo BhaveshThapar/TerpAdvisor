@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
-from app.engine.degree_audit import build_requirements_for_major
+from app.engine.requirements_loader import load_requirements_for_major
 from app.models import Course, Professor, Review
 from app.schemas.schemas import CourseResponse
 
@@ -226,7 +226,7 @@ async def get_course_detail(
     fulfills = []
     for major_name in ["Computer Science", "Mathematics", "Information Science",
                        "Economics", "Biological Sciences", "Mechanical Engineering"]:
-        reqs = build_requirements_for_major(major_name)
+        reqs = await load_requirements_for_major(db, major_name)
         for group in reqs.groups:
             for req in group.requirements:
                 if course.course_id in req.course_options:

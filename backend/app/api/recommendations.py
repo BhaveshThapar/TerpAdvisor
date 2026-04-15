@@ -6,7 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.engine.course_graph import CourseGraph, CourseNode, PrereqNode, PrereqType
-from app.engine.degree_audit import DegreeAuditor, build_cs_requirements, build_requirements_for_major
+from app.engine.degree_audit import DegreeAuditor, build_cs_requirements
+from app.engine.requirements_loader import load_requirements_for_major
 from app.engine.planner import PlanGenerator
 from app.engine.recommender import RecommendationEngine
 from app.engine.scorers.base import ScoringContext
@@ -28,258 +29,6 @@ from app.schemas.schemas import (
 router = APIRouter(prefix="/api", tags=["recommendations"])
 
 _engine = RecommendationEngine()
-
-
-def _build_cs_graph() -> CourseGraph:
-    """Build the CS prerequisite DAG."""
-    graph = CourseGraph()
-    courses = [
-        CourseNode("CMSC131", "Object-Oriented Programming I", 4, "CMSC"),
-        CourseNode("CMSC132", "Object-Oriented Programming II", 4, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC131"])),
-        CourseNode("CMSC216", "Introduction to Computer Systems", 4, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC132"])),
-        CourseNode("CMSC250", "Discrete Structures", 4, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC131"])),
-        CourseNode("CMSC320", "Introduction to Data Science", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC216", "CMSC250"])),
-        CourseNode("CMSC330", "Organization of Programming Languages", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC216", "CMSC250"])),
-        CourseNode("CMSC335", "Web Application Development", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC216"])),
-        CourseNode("CMSC351", "Algorithms", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC250", "CMSC216"])),
-        CourseNode("CMSC411", "Computer Systems Architecture", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC330"])),
-        CourseNode("CMSC412", "Operating Systems", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC330", "CMSC351"])),
-        CourseNode("CMSC414", "Computer and Network Security", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC330", "CMSC351"])),
-        CourseNode("CMSC417", "Computer Networks", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC351"])),
-        CourseNode("CMSC420", "Advanced Data Structures", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC330", "CMSC351"])),
-        CourseNode("CMSC421", "Introduction to Artificial Intelligence", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC330", "CMSC351"])),
-        CourseNode("CMSC422", "Introduction to Machine Learning", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC320", "CMSC330", "CMSC351"])),
-        CourseNode("CMSC424", "Database Design", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC330", "CMSC351"])),
-        CourseNode("CMSC430", "Introduction to Compilers", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC330", "CMSC351"])),
-        CourseNode("CMSC433", "Programming Language Technologies and Paradigms", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC330"])),
-        CourseNode("CMSC434", "Human-Computer Interaction", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC330"])),
-        CourseNode("CMSC435", "Software Engineering", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC330", "CMSC351"])),
-        CourseNode("CMSC451", "Design and Analysis of Computer Algorithms", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC351"])),
-        CourseNode("CMSC456", "Cryptography", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC351"])),
-        CourseNode("CMSC460", "Computational Methods", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC330", "CMSC351"])),
-        CourseNode("CMSC470", "Introduction to Natural Language Processing", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC330", "CMSC351"])),
-        CourseNode("CMSC471", "Introduction to Data Visualization", 3, "CMSC",
-                   PrereqNode(PrereqType.ALL, ["CMSC330"])),
-        CourseNode("MATH140", "Calculus I", 4, "MATH"),
-        CourseNode("MATH141", "Calculus II", 4, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH140"])),
-        CourseNode("MATH240", "Linear Algebra", 4, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH141"])),
-        CourseNode("MATH241", "Calculus III", 4, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH141"])),
-        CourseNode("MATH461", "Linear Algebra for Scientists and Engineers", 3, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH141"])),
-        CourseNode("STAT400", "Applied Probability and Statistics I", 3, "STAT",
-                   PrereqNode(PrereqType.ALL, ["MATH141"])),
-        CourseNode("ENGL101", "Academic Writing", 3, "ENGL"),
-        CourseNode("INST126", "Introduction to Information Science", 3, "INST"),
-    ]
-    for c in courses:
-        graph.add_course(c)
-    return graph
-
-
-def _build_infosci_graph() -> CourseGraph:
-    """Build the Information Science prerequisite DAG."""
-    graph = CourseGraph()
-    courses = [
-        # Core INST sequence
-        CourseNode("INST126", "Introduction to Information Science", 3, "INST"),
-        CourseNode("INST201", "Object-Oriented Programming for Information Science", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST126"])),
-        CourseNode("INST311", "Information Organization", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST201"])),
-        CourseNode("INST314", "Data Science for Information Science", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST201"])),
-        CourseNode("INST352", "Human-Computer Interaction", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST201"])),
-        CourseNode("INST362", "Information Architecture", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST311"])),
-        # Upper-level electives (no prereqs within graph — just need 201)
-        CourseNode("INST327", "Information Privacy", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST201"])),
-        CourseNode("INST335", "Information Policy", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST201"])),
-        CourseNode("INST346", "Technologies for Information Services", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST201"])),
-        CourseNode("INST354", "Decision-Making for Information Science", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST201"])),
-        CourseNode("INST377", "Dynamic Web Applications", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST201"])),
-        CourseNode("INST408", "Special Topics in Information Science", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST311"])),
-        CourseNode("INST414", "Data Science Techniques", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST314"])),
-        CourseNode("INST447", "Data Analytics", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST314"])),
-        CourseNode("INST462", "User Experience Research", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST352"])),
-        CourseNode("INST466", "Information Systems Design", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST362"])),
-        CourseNode("INST490", "Capstone in Information Science", 3, "INST",
-                   PrereqNode(PrereqType.ALL, ["INST362", "INST314"])),
-        # Supporting courses
-        CourseNode("STAT100", "Elementary Statistics and Probability", 3, "STAT"),
-        CourseNode("MATH115", "Precalculus", 3, "MATH"),
-        CourseNode("ENGL101", "Academic Writing", 3, "ENGL"),
-        CourseNode("ENGL393", "Technical Writing", 3, "ENGL",
-                   PrereqNode(PrereqType.ALL, ["ENGL101"])),
-    ]
-    for c in courses:
-        graph.add_course(c)
-    return graph
-
-
-def _build_math_graph() -> CourseGraph:
-    """Build the Mathematics prerequisite DAG."""
-    graph = CourseGraph()
-    courses = [
-        CourseNode("MATH140", "Calculus I", 4, "MATH"),
-        CourseNode("MATH141", "Calculus II", 4, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH140"])),
-        CourseNode("MATH240", "Linear Algebra", 4, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH141"])),
-        CourseNode("MATH241", "Calculus III", 4, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH141"])),
-        CourseNode("MATH246", "Differential Equations", 3, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH141"])),
-        CourseNode("MATH310", "Introduction to Mathematical Proof", 3, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH141"])),
-        CourseNode("MATH401", "Applications of Linear Algebra", 3, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH240", "MATH241"])),
-        CourseNode("MATH403", "Introduction to Abstract Algebra", 3, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH310"])),
-        CourseNode("MATH405", "Linear Algebra", 3, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH240", "MATH310"])),
-        CourseNode("MATH410", "Advanced Calculus I", 3, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH241", "MATH310"])),
-        CourseNode("MATH411", "Advanced Calculus II", 3, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH410"])),
-        CourseNode("MATH416", "Applied Harmonic Analysis", 3, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH240", "MATH241"])),
-        CourseNode("MATH420", "Mathematical Modeling", 3, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH240", "MATH246"])),
-        CourseNode("MATH461", "Linear Algebra for Scientists and Engineers", 3, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH141"])),
-        CourseNode("STAT400", "Applied Probability and Statistics I", 3, "STAT",
-                   PrereqNode(PrereqType.ALL, ["MATH141"])),
-        CourseNode("STAT401", "Applied Probability and Statistics II", 3, "STAT",
-                   PrereqNode(PrereqType.ALL, ["STAT400"])),
-        CourseNode("CMSC131", "Object-Oriented Programming I", 4, "CMSC"),
-        CourseNode("ENGL101", "Academic Writing", 3, "ENGL"),
-    ]
-    for c in courses:
-        graph.add_course(c)
-    return graph
-
-
-def _build_biology_graph() -> CourseGraph:
-    """Build the Biological Sciences prerequisite DAG."""
-    graph = CourseGraph()
-    courses = [
-        CourseNode("BSCI105", "Principles of Biology I", 3, "BSCI"),
-        CourseNode("BSCI106", "Principles of Biology II", 3, "BSCI",
-                   PrereqNode(PrereqType.ALL, ["BSCI105"])),
-        CourseNode("BSCI207", "Principles of Biology III", 3, "BSCI",
-                   PrereqNode(PrereqType.ALL, ["BSCI106"])),
-        CourseNode("BSCI222", "Principles of Genetics", 3, "BSCI",
-                   PrereqNode(PrereqType.ALL, ["BSCI106"])),
-        CourseNode("BSCI330", "Cell Biology and Physiology", 3, "BSCI",
-                   PrereqNode(PrereqType.ALL, ["BSCI207", "BSCI222"])),
-        CourseNode("BSCI338", "Animal Physiology", 3, "BSCI",
-                   PrereqNode(PrereqType.ALL, ["BSCI330"])),
-        CourseNode("BSCI440", "Developmental Biology", 3, "BSCI",
-                   PrereqNode(PrereqType.ALL, ["BSCI330"])),
-        CourseNode("BSCI424", "Biochemistry I", 3, "BSCI",
-                   PrereqNode(PrereqType.ALL, ["BSCI207"])),
-        CourseNode("CHEM131", "General Chemistry I", 3, "CHEM"),
-        CourseNode("CHEM132", "General Chemistry II", 3, "CHEM",
-                   PrereqNode(PrereqType.ALL, ["CHEM131"])),
-        CourseNode("CHEM241", "Organic Chemistry I", 3, "CHEM",
-                   PrereqNode(PrereqType.ALL, ["CHEM132"])),
-        CourseNode("CHEM242", "Organic Chemistry II", 3, "CHEM",
-                   PrereqNode(PrereqType.ALL, ["CHEM241"])),
-        CourseNode("MATH140", "Calculus I", 4, "MATH"),
-        CourseNode("MATH141", "Calculus II", 4, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH140"])),
-        CourseNode("STAT100", "Elementary Statistics and Probability", 3, "STAT"),
-        CourseNode("PHYS141", "General Physics: Mechanics and Particle Dynamics", 3, "PHYS",
-                   PrereqNode(PrereqType.ALL, ["MATH140"])),
-        CourseNode("PHYS142", "General Physics: Vibrations, Waves, Heat, Electricity, and Magnetism", 3, "PHYS",
-                   PrereqNode(PrereqType.ALL, ["PHYS141"])),
-        CourseNode("ENGL101", "Academic Writing", 3, "ENGL"),
-    ]
-    for c in courses:
-        graph.add_course(c)
-    return graph
-
-
-def _build_econ_graph() -> CourseGraph:
-    """Build the Economics prerequisite DAG."""
-    graph = CourseGraph()
-    courses = [
-        CourseNode("ECON200", "Principles of Micro-Economics", 3, "ECON"),
-        CourseNode("ECON201", "Principles of Macro-Economics", 3, "ECON"),
-        CourseNode("ECON305", "Intermediate Macroeconomic Theory and Policy", 3, "ECON",
-                   PrereqNode(PrereqType.ALL, ["ECON200", "ECON201"])),
-        CourseNode("ECON306", "Intermediate Microeconomic Theory", 3, "ECON",
-                   PrereqNode(PrereqType.ALL, ["ECON200", "ECON201"])),
-        CourseNode("ECON321", "Principles of Econometrics", 3, "ECON",
-                   PrereqNode(PrereqType.ALL, ["ECON306"])),
-        CourseNode("ECON330", "Money and Banking", 3, "ECON",
-                   PrereqNode(PrereqType.ALL, ["ECON305"])),
-        CourseNode("ECON340", "International Economics", 3, "ECON",
-                   PrereqNode(PrereqType.ALL, ["ECON305", "ECON306"])),
-        CourseNode("ECON380", "Economics of the Public Sector", 3, "ECON",
-                   PrereqNode(PrereqType.ALL, ["ECON306"])),
-        CourseNode("ECON422", "Econometric Methods", 3, "ECON",
-                   PrereqNode(PrereqType.ALL, ["ECON321"])),
-        CourseNode("ECON430", "Industrial Organization", 3, "ECON",
-                   PrereqNode(PrereqType.ALL, ["ECON306"])),
-        CourseNode("MATH140", "Calculus I", 4, "MATH"),
-        CourseNode("MATH141", "Calculus II", 4, "MATH",
-                   PrereqNode(PrereqType.ALL, ["MATH140"])),
-        CourseNode("STAT400", "Applied Probability and Statistics I", 3, "STAT",
-                   PrereqNode(PrereqType.ALL, ["MATH141"])),
-        CourseNode("ENGL101", "Academic Writing", 3, "ENGL"),
-    ]
-    for c in courses:
-        graph.add_course(c)
-    return graph
-
-
-def _build_graph_for_major(major: str) -> CourseGraph:
-    """Return the prerequisite DAG for the given major."""
-    builders = {
-        "Information Science": _build_infosci_graph,
-        "Mathematics": _build_math_graph,
-        "Biological Sciences": _build_biology_graph,
-        "Economics": _build_econ_graph,
-    }
-    return builders.get(major, _build_cs_graph)()
 
 
 async def _get_completed_credits(
@@ -443,11 +192,11 @@ async def get_recommendations(body: RecommendationRequest, db: AsyncSession = De
     completed = set(completed_credits.keys())
     major = body.major or "Computer Science"
 
-    graph = _build_graph_for_major(major)
-    requirements = build_requirements_for_major(major)
+    requirements = await load_requirements_for_major(db, major, body.track or "General")
+    graph = await CourseGraph.build_from_umd_catalog(db, major, requirements=requirements)
     auditor = DegreeAuditor(requirements)
 
-    if body.goal == "easiest":
+    if body.goal == "easiest" and not body.show_prerequisites_only:
         catalog_result = await db.execute(select(Course.course_id))
         available = [cid for cid in catalog_result.scalars().all() if cid not in completed]
     else:
@@ -516,8 +265,6 @@ async def get_recommendations(body: RecommendationRequest, db: AsyncSession = De
     weight_overrides = dict(body.weight_overrides or {})
     preference_tags = body.preference_tags
     if body.goal == "easiest":
-        if not preference_tags:
-            preference_tags = ["online", "no-attendance", "no-final-exam", "light-workload", "easy-a"]
         easiest_defaults: dict[str, float] = {
             "gpa": 0.50,
             "preference_tags": 0.30,
@@ -541,6 +288,38 @@ async def get_recommendations(body: RecommendationRequest, db: AsyncSession = De
 
     result = await _engine.recommend(available, context, body.top_n)
 
+    if body.goal != "easiest" and requirement_impact and body.top_n >= 4:
+        elective_ids = [cid for cid in available if cid not in requirement_impact]
+        if elective_ids:
+            elective_weights = dict(weight_overrides)
+            elective_weights["requirement"] = 0.0
+            elective_context = await _build_scoring_context(
+                db, elective_ids, completed, major, requirement_impact,
+                elective_weights, preference_tags=preference_tags,
+            )
+            elective_result = await _engine.recommend(
+                elective_ids, elective_context, body.top_n,
+            )
+            k = max(3, body.top_n // 4)
+            keep_requirement = body.top_n - k
+            existing_ids = {r.course_id for r in result.recommendations[:keep_requirement]}
+            elective_picks = [
+                r for r in elective_result.recommendations
+                if r.course_id not in existing_ids
+            ][:k]
+            merged = result.recommendations[:keep_requirement] + elective_picks
+            merged.sort(key=lambda r: r.final_score, reverse=True)
+            for idx, rec in enumerate(merged, start=1):
+                rec.rank = idx
+            result.recommendations = merged
+
+    recommended_ids = [r.course_id for r in result.recommendations]
+    classification = auditor.classify_courses(
+        recommended_ids,
+        completed,
+        course_gen_eds={cid: course_meta.get(cid, {}).get("gen_eds") or [] for cid in recommended_ids},
+    )
+
     return RecommendationListResponse(
         recommendations=[
             RecommendationResponse(
@@ -551,6 +330,8 @@ async def get_recommendations(body: RecommendationRequest, db: AsyncSession = De
                      "contribution": e.contribution, "text": e.text}
                     for e in r.explanations
                 ],
+                fulfills_requirements=classification.get(r.course_id, []),
+                section="major_requirement" if classification.get(r.course_id) else "other_course",
             )
             for r in result.recommendations
         ],
@@ -584,7 +365,7 @@ async def get_degree_audit(body: AuditRequest, db: AsyncSession = Depends(get_db
         else:
             course_gen_eds[cid] = list(set(course_gen_eds[cid] + tags))
 
-    requirements = build_requirements_for_major(major, body.track)
+    requirements = await load_requirements_for_major(db, major, body.track or "General")
 
     # If the student declared a minor, inject its department prefixes into the ULC requirement
     if body.minor_prefix:
@@ -640,8 +421,8 @@ async def generate_plan(body: PlanRequest, db: AsyncSession = Depends(get_db)):
     completed = await _get_completed_credits(body.completed_courses, db)
     major = body.major or "Computer Science"
 
-    graph = _build_graph_for_major(major)
-    requirements = build_requirements_for_major(major, body.track)
+    requirements = await load_requirements_for_major(db, major, body.track or "General")
+    graph = await CourseGraph.build_from_umd_catalog(db, major, requirements=requirements)
     auditor = DegreeAuditor(requirements)
     # Include graph courses and any requirement courses not in the graph (default 3 credits)
     credit_map: dict[str, int] = {

@@ -10,17 +10,47 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from app.api import courses, professors, recommendations, schedule
+from app.api import courses, majors, professors, recommendations, schedule
 from app.config import settings
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: create any missing tables (no Alembic migrations)
-    from app.db.session import engine, Base
+    import asyncio
+    import logging
+
+    from sqlalchemy import select, func
+
+    from app.db.session import engine, Base, SyncSession
     import app.models  # noqa: F401 — registers all mapped classes with Base
+    from app.models.major import Major
+
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Seed majors table if empty so /api/majors returns data on a fresh DB.
+    def _seed_if_empty() -> tuple[int, int] | None:
+        from scripts.seed_majors import seed_majors
+
+        with SyncSession() as session:
+            count = session.execute(select(func.count()).select_from(Major)).scalar_one()
+            if count > 0:
+                return None
+            result = seed_majors(session)
+            session.commit()
+            return result
+
+    try:
+        result = await asyncio.to_thread(_seed_if_empty)
+        if result is not None:
+            inserted, updated = result
+            logging.getLogger("terpadvisor").info(
+                "Seeded majors table: inserted=%d updated=%d", inserted, updated
+            )
+    except Exception:
+        logging.getLogger("terpadvisor").exception("Failed to auto-seed majors table")
+
     yield
     # Shutdown: close connections
 
@@ -69,6 +99,7 @@ app.include_router(courses.router)
 app.include_router(recommendations.router)
 app.include_router(schedule.router)
 app.include_router(professors.router)
+app.include_router(majors.router)
 
 
 @app.get("/api/health")

@@ -7,7 +7,7 @@ from app.config import settings
 from app.db.session import Base
 
 # Import ALL models so Base.metadata knows about them
-from app.models import user, course, requirement, professor, review, section  # noqa: F401
+from app.models import user, course, major, professor, review, section  # noqa: F401
 from app.cache.multi_layer import CacheEntry  # noqa: F401
 
 config = context.config

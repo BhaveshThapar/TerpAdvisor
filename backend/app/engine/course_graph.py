@@ -13,10 +13,16 @@ Key algorithms:
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Optional
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+logger = logging.getLogger(__name__)
 
 
 class PrereqType(Enum):
@@ -277,3 +283,126 @@ class CourseGraph:
                     queue.append(prereq)
 
         return result
+
+    # ──────────────────────────────────────────────
+    # Dynamic Graph Building from UMD Catalog
+    # ──────────────────────────────────────────────
+
+    @staticmethod
+    async def build_from_umd_catalog(
+        db: AsyncSession,
+        major: str,
+        requirements: "DegreeRequirements | None" = None,
+    ) -> CourseGraph:
+        """
+        Build a CourseGraph dynamically from the database for a given major.
+
+        If `requirements` is provided, the department list is derived from the
+        course options and prefix patterns in the catalog — this is the
+        preferred path and works for any major seeded in the `majors` table.
+        Otherwise falls back to a hardcoded static map for back-compat.
+        """
+        from app.models import Course
+        from app.engine.prerequisite_parser import parse_prerequisite_expression
+
+        if requirements is not None:
+            major_departments = CourseGraph._departments_from_requirements(requirements)
+        else:
+            major_departments = CourseGraph._get_departments_for_major(major)
+
+        # Always include common gen-ed staples so planning can satisfy
+        # non-major requirements pulled from catalog prefix patterns.
+        major_departments = sorted(set(major_departments) | {"MATH", "STAT", "ENGL"})
+
+        graph = CourseGraph()
+
+        result = await db.execute(
+            select(Course).where(Course.department.in_(major_departments))
+        )
+        courses = result.scalars().all()
+
+        if not courses:
+            logger.error(
+                "build_from_umd_catalog: empty course set for major=%r depts=%s",
+                major,
+                major_departments,
+            )
+
+        # Parse and add each course to the graph
+        for course in courses:
+            # Parse prerequisites
+            prereq_node = None
+            if course.prerequisites_raw:
+                try:
+                    prereq_node = parse_prerequisite_expression(
+                        course.prerequisites_raw
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to parse prerequisites for {course.course_id}: {e}"
+                    )
+                    prereq_node = None
+
+            # Create CourseNode and add to graph
+            course_node = CourseNode(
+                course_id=course.course_id,
+                name=course.name,
+                credits=course.credits,
+                department=course.department,
+                prereqs=prereq_node,
+            )
+            graph.add_course(course_node)
+
+        logger.info(
+            f"Built dynamic graph for {major}: {len(graph.courses)} courses"
+        )
+        return graph
+
+    @staticmethod
+    def _departments_from_requirements(reqs: "DegreeRequirements") -> list[str]:
+        """Extract department prefixes from a loaded DegreeRequirements tree."""
+        depts: set[str] = set()
+        for group in reqs.groups:
+            for req in group.requirements:
+                for cid in req.course_options:
+                    prefix = "".join(c for c in cid if c.isalpha())
+                    if prefix:
+                        depts.add(prefix)
+                for pat in req.prefix_patterns:
+                    prefix = "".join(c for c in pat if c.isalpha())
+                    if prefix:
+                        depts.add(prefix)
+        return sorted(depts)
+
+    @staticmethod
+    def _get_departments_for_major(major: str) -> list[str]:
+        """
+        Map a major to the departments whose courses count toward that degree.
+
+        Returns a list of department codes (e.g., ["CMSC", "MATH", "STAT"]).
+        If the major is not recognized, returns an empty list.
+
+        This mapping is derived from UMD's official curriculum structure.
+        It should be kept in sync with the degree requirements system.
+        """
+        # Normalize major name
+        major_lower = major.lower()
+
+        major_to_depts = {
+            # Computer Science
+            "computer science": ["CMSC", "MATH", "STAT", "ENGL", "INST"],
+            # Information Science
+            "information science": ["INST", "MATH", "STAT", "ENGL"],
+            # Mathematics
+            "mathematics": ["MATH", "STAT", "CMSC", "ENGL"],
+            # Biological Sciences
+            "biological sciences": ["BSCI", "CHEM", "MATH", "STAT", "PHYS", "ENGL"],
+            # Economics
+            "economics": ["ECON", "MATH", "STAT", "ENGL"],
+            # Mechanical Engineering
+            "mechanical engineering": ["ENME", "MATH", "PHYS", "CHEM", "ENGL"],
+            # Add more majors as they're added to the system
+            # This list will grow as degree requirements are implemented for each major
+        }
+
+        return major_to_depts.get(major_lower, [])

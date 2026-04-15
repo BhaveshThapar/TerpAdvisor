@@ -99,3 +99,34 @@ class TestHighestImpactCourses:
         # CMSC131 is already done — it shouldn't show impact
         impact = auditor.get_highest_impact_courses(completed, ["CMSC131"])
         assert len(impact) == 0
+
+
+class TestClassifyCourses:
+    def test_matches_explicit_options(self):
+        auditor = _build_auditor()
+        result = auditor.classify_courses(["CMSC132", "MATH141"], completed=set())
+        assert "lower_cs" in result["CMSC132"]
+        assert "math" in result["MATH141"]
+
+    def test_matches_prefix_patterns(self):
+        auditor = _build_auditor()
+        # CMSC4xx upper-level elective satisfies upper_cs via prefix_patterns
+        completed = {"CMSC131", "CMSC132", "CMSC216", "CMSC250", "CMSC351"}
+        result = auditor.classify_courses(["CMSC498A"], completed=completed)
+        assert "upper_cs" in result["CMSC498A"]
+
+    def test_skips_already_satisfied_requirements(self):
+        auditor = _build_auditor()
+        # CMSC131 explicitly satisfies the Intro to CS I requirement.
+        # If we mark it completed and then ask to classify it again, that
+        # specific requirement should no longer pull the group in.
+        completed = {"CMSC131"}
+        result = auditor.classify_courses(["CMSC131"], completed=completed)
+        # Already-completed courses are skipped entirely
+        assert result["CMSC131"] == []
+
+    def test_unrelated_course_has_no_groups(self):
+        auditor = _build_auditor()
+        # MUSC150 isn't in any CS requirement option list or prefix pattern
+        result = auditor.classify_courses(["MUSC150"], completed=set())
+        assert result["MUSC150"] == []

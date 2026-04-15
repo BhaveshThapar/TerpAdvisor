@@ -94,6 +94,8 @@ export interface Recommendation {
   top_reason: string;
   confidence: number;
   explanations: Explanation[];
+  section: "major_requirement" | "other_course";
+  fulfills_requirements: string[];
 }
 
 export interface RecommendationList {
@@ -216,6 +218,13 @@ export const DEFAULT_WEIGHTS: WeightConfig = {
   sentiment: 0.10,
   collaborative: 0.05,
   schedule_fit: 0.10,
+};
+
+// ── Majors ────────────────────────────────────
+export type MajorSummary = {
+  name: string;
+  code: string | null;
+  tracks: string[];
 };
 
 // ── Preferences ───────────────────────────────

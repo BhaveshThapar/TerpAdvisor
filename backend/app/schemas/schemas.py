@@ -7,45 +7,6 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-# ── User ──────────────────────────────────────
-
-class UserCreate(BaseModel):
-    email: str
-    display_name: str
-    major: str
-    minor: str | None = None
-
-
-class UserResponse(BaseModel):
-    id: str
-    email: str
-    display_name: str
-    major: str
-    minor: str | None
-    model_config = {"from_attributes": True}
-
-
-class UserUpdate(BaseModel):
-    display_name: str | None = None
-    major: str | None = None
-    minor: str | None = None
-
-
-# ── Course History ────────────────────────────
-
-class CompletedCourseAdd(BaseModel):
-    course_id: str
-    semester: str | None = None
-    grade: str | None = None
-
-
-class CompletedCourseResponse(BaseModel):
-    course_id: str
-    semester: str | None
-    grade: str | None
-    model_config = {"from_attributes": True}
-
-
 # ── Course ────────────────────────────────────
 
 class CourseResponse(BaseModel):
@@ -120,10 +81,12 @@ class ReviewResponse(BaseModel):
 class RecommendationRequest(BaseModel):
     completed_courses: list[str] = []  # course IDs the student has completed
     major: str = "Computer Science"
+    track: str = "General"
     weight_overrides: dict[str, float] | None = None
     filters: RecommendationFilters | None = None
     preference_tags: list[str] | None = None  # e.g., ["project-based", "no-final-exam"]
     goal: Literal["balanced", "easiest"] = "balanced"
+    show_prerequisites_only: bool = False
     top_n: int = 20
 
 
@@ -154,6 +117,8 @@ class RecommendationResponse(BaseModel):
     top_reason: str
     confidence: float
     explanations: list[ExplanationResponse]
+    section: Literal["major_requirement", "other_course"] = "other_course"
+    fulfills_requirements: list[str] = []
 
 
 class RecommendationListResponse(BaseModel):
@@ -275,40 +240,12 @@ class MultiSemesterPlanResponse(BaseModel):
     warnings: list[str]
 
 
-# ── Cart ──────────────────────────────────────
+# ── Majors ────────────────────────────────────
 
-class CartAddRequest(BaseModel):
-    course_id: str
-
-
-class CartItemResponse(BaseModel):
-    course_id: str
-    added_at: str
-    model_config = {"from_attributes": True}
-
-
-# ── Wishlist ────────────────────────────────────
-
-class WishlistAddRequest(BaseModel):
-    course_id: str
-
-
-class WishlistItemResponse(BaseModel):
-    course_id: str
-    added_at: str
-    model_config = {"from_attributes": True}
-
-
-# ── User Preferences ──────────────────────────
-class UserPreferencesSchema(BaseModel):
-    weight_overrides: dict[str, float] | None = None
-    preference_tags: list[str] | None = None
-    filters: dict | None = None          # serialized RecommendationFilters
-    schedule_preferences: dict | None = None  # serialized SchedulePreferencesSchema
-
-
-class UserPreferencesResponse(BaseModel):
-    preferences: UserPreferencesSchema
+class MajorSummary(BaseModel):
+    name: str
+    code: str | None
+    tracks: list[str]
 
 
 # Forward references

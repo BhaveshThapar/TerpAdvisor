@@ -141,3 +141,139 @@ class TestUnlockedCourses:
         assert "CMSC250" in all_prereqs
         assert "CMSC132" in all_prereqs
         assert "CMSC131" in all_prereqs
+
+
+class _StubCourse:
+    def __init__(self, course_id: str, department: str, credits: int = 3):
+        self.course_id = course_id
+        self.name = course_id
+        self.department = department
+        self.credits = credits
+        self.prerequisites_raw = None
+
+
+class _StubScalarResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def all(self):
+        return list(self._rows)
+
+
+class _StubExecuteResult:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def scalars(self):
+        return _StubScalarResult(self._rows)
+
+
+class _StubDB:
+    """Fake AsyncSession that captures the department filter and returns stub rows."""
+
+    def __init__(self, courses_by_dept: dict[str, list[_StubCourse]]):
+        self._by_dept = courses_by_dept
+        self.last_departments: list[str] | None = None
+
+    async def execute(self, stmt):
+        depts: list[str] = []
+        try:
+            clause = stmt.whereclause
+            if clause is not None and hasattr(clause, "right"):
+                val = clause.right.value
+                if isinstance(val, (list, tuple, set)):
+                    depts = list(val)
+        except Exception:
+            pass
+        self.last_departments = depts
+        rows: list[_StubCourse] = []
+        for d in depts:
+            rows.extend(self._by_dept.get(d, []))
+        return _StubExecuteResult(rows)
+
+
+class TestDepartmentsFromRequirements:
+    def test_extracts_from_course_options(self):
+        from app.engine.degree_audit import build_cs_requirements
+        reqs = build_cs_requirements()
+        depts = CourseGraph._departments_from_requirements(reqs)
+        assert "CMSC" in depts
+        assert "MATH" in depts
+
+    def test_extracts_from_prefix_patterns(self):
+        from app.engine.degree_audit import (
+            DegreeRequirements, Requirement, RequirementGroup, RequirementType,
+        )
+        reqs = DegreeRequirements(
+            major="Test",
+            catalog_year="2025",
+            track="General",
+            total_credits_required=120,
+            groups=[
+                RequirementGroup(
+                    id="ulc", name="ULC", description="",
+                    requirements=[
+                        Requirement(
+                            id="ulc1", name="ULC", type=RequirementType.ELECTIVE,
+                            course_options=[], credits_needed=3,
+                            prefix_patterns=["INST3", "INST4"],
+                        ),
+                    ],
+                ),
+            ],
+        )
+        depts = CourseGraph._departments_from_requirements(reqs)
+        assert depts == ["INST"]
+
+
+class TestBuildFromUmdCatalogDynamic:
+    @pytest.mark.asyncio
+    async def test_cs_uses_cmsc_courses(self):
+        from app.engine.degree_audit import build_cs_requirements
+        reqs = build_cs_requirements()
+        db = _StubDB({
+            "CMSC": [_StubCourse("CMSC131", "CMSC", 4), _StubCourse("CMSC132", "CMSC", 4)],
+            "MATH": [_StubCourse("MATH140", "MATH", 4)],
+        })
+        graph = await CourseGraph.build_from_umd_catalog(db, "Computer Science", requirements=reqs)
+        assert "CMSC131" in graph.courses
+        assert "MATH140" in graph.courses
+        assert "CMSC" in db.last_departments
+        assert "MATH" in db.last_departments
+
+    @pytest.mark.asyncio
+    async def test_information_science_pulls_inst_courses(self):
+        """Sprint 4 regression: pre-fix, InfoSci worked but any major outside the
+        hardcoded 6 got an empty graph. Dynamic derivation must pull INST."""
+        from app.engine.degree_audit import build_requirements_for_major
+        reqs = build_requirements_for_major("Information Science")
+        db = _StubDB({
+            "INST": [_StubCourse("INST126", "INST"), _StubCourse("INST155", "INST")],
+        })
+        graph = await CourseGraph.build_from_umd_catalog(
+            db, "Information Science", requirements=reqs,
+        )
+        assert "INST" in db.last_departments
+        assert "INST126" in graph.courses
+        assert "INST155" in graph.courses
+
+    @pytest.mark.asyncio
+    async def test_empty_graph_logs_error(self, caplog):
+        from app.engine.degree_audit import build_cs_requirements
+        reqs = build_cs_requirements()
+        db = _StubDB({})  # nothing for any dept
+        with caplog.at_level("ERROR"):
+            graph = await CourseGraph.build_from_umd_catalog(
+                db, "Computer Science", requirements=reqs,
+            )
+        assert len(graph.courses) == 0
+        assert any("empty course set" in rec.message for rec in caplog.records)
+
+    @pytest.mark.asyncio
+    async def test_fallback_to_static_map_when_no_requirements(self):
+        db = _StubDB({
+            "CMSC": [_StubCourse("CMSC131", "CMSC", 4)],
+            "MATH": [_StubCourse("MATH140", "MATH", 4)],
+        })
+        graph = await CourseGraph.build_from_umd_catalog(db, "Computer Science")
+        assert "CMSC131" in graph.courses

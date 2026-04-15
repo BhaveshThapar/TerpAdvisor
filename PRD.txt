@@ -2,12 +2,12 @@ PRODUCT REQUIREMENTS DOCUMENT
 TerpAdvisor
 Intelligent Course Recommendation Engine for UMD Students
 
-Author: Bhavesh Thapar Version: 3.0  |  April 2026 Status: In Progress
+Author: Bhavesh Thapar Version: 3.1  |  April 2026 Status: In Progress
 
 1. Executive Summary
-TerpAdvisor is a full-stack web application that provides personalized course recommendations to University of Maryland students. It combines a DAG-based prerequisite engine, a hybrid multi-scorer recommendation pipeline, CSP-based schedule optimization, an Easiest Classes discovery mode, and a three-tier cache to deliver intelligent, degree-aware course guidance.
+TerpAdvisor is a full-stack web application that provides personalized course recommendations to University of Maryland students. It combines a dynamic per-major prerequisite DAG, a hybrid multi-scorer recommendation pipeline, CSP-based schedule optimization, an Easiest Classes discovery mode, and a three-tier cache to deliver intelligent, degree-aware course guidance.
 
-Version 3.0 of this document reflects the as-built state of the system after the Easiest Classes & Cross-Department Recommendations update. The backend is feature-complete including transcript upload (text and PDF), collaborative filtering, multi-semester planning, iCal export, full-catalog candidate sourcing for the easiest-classes goal, and resilient external-API infrastructure. The frontend covers all primary user flows with a polished Next.js + Tailwind UI including the new Goal selector.
+Version 3.1 of this document reflects the Dynamic Catalog update. The backend no longer hardcodes per-major course graphs or requirement trees — both are now derived at request time from the seeded UMD catalog and a new majors table. Key additions: a umd.io prerequisite parser that builds PrereqNode trees from upstream JSON, a dynamic CourseGraph.build_from_umd_catalog() that selects relevant departments from the loaded requirements, a majors table (Alembic migration a1b2c3d4e5f6) seeded via scripts/seed_majors.py, a requirements_loader with 1-hour TTL cache and graceful fallback, a GET /api/majors endpoint powering a dynamic onboarding dropdown, recommendation section grouping ("Major Requirements" vs "Other Courses") with fulfills_requirements badges, and a show_prerequisites_only filter on /api/recommendations. Test suite is at 84 passing tests (up from 63 in v3.0). The frontend onboarding page now sources majors and tracks directly from the backend, and the recommendations page groups results and exposes the prerequisite-only toggle.
 
 2. Problem Statement
 Course selection at UMD remains fragmented and time-consuming. Students must cross-reference:
@@ -64,8 +64,8 @@ PDF upload (POST /api/courses/parse-transcript-pdf): upload an unofficial transc
 The parser handles edge cases including: repeated courses (most recent grade wins), withdrawals (W/AW/XF excluded), AP/transfer equivalency credits (mapped to UMD course IDs where possible, or stored as TR_<credits>_<name> tokens), and in-progress courses (tagged separately for corequisite checking).
 
 5.2 Degree Requirement Tracking & Audit
-POST /api/audit runs a full degree audit against the student's completed courses.
-Supported majors at launch:
+POST /api/audit runs a full degree audit against the student's completed courses. As of v3.1, requirements are seeded into the majors table via backend/scripts/seed_majors.py and loaded at request time through backend/app/engine/requirements_loader.py (1-hour TTL in-process cache; falls back to in-memory MAJOR_BUILDERS on DB miss; falls back to Computer Science as last resort). Any major added to the majors table works end-to-end (recommendations, audit, plan) without code changes.
+Seeded majors at launch:
 Major | Tracks / Concentrations | GenEd Support
 Computer Science B.S. | General, Data Science, Machine Learning, Quantum Information | Yes
 Mathematics B.S. | General | Yes
@@ -78,6 +78,15 @@ The audit result includes: overall progress %, credits completed vs. required, p
 Minor support: a minor_prefix field injects department-level 300/400-level courses into the Upper-Level Coursework (ULC) requirement automatically.
 
 The audit engine is also called internally by the Easiest Classes mode to detect whether any GenEd requirements remain, allowing the recommendation candidate pool to be automatically narrowed to GenEd-satisfying courses when applicable.
+
+5.2.1 Dynamic Catalog Architecture (New in v3.1)
+Prior to v3.1, each supported major had a hand-written course graph builder inside app/api/recommendations.py. Adding a major meant writing ~50 lines of CourseNode/PrereqNode literals, and students whose major wasn't listed silently fell back to CS — hiding legitimate courses (e.g. INST155 never appeared for Info Sci students because the hardcoded INST graph only listed ~20 courses). v3.1 replaces all of that with dynamic DB-driven construction:
+
+- Prerequisite parser (app/engine/prerequisite_parser.py): converts umd.io prerequisite JSON (and/or/coreq/nested structures, plain strings, and lists) into PrereqNode trees. Handles null/empty expressions gracefully.
+- Dynamic graph builder (CourseGraph.build_from_umd_catalog in app/engine/course_graph.py): given a major and its loaded DegreeRequirements, extracts all department prefixes from requirements.groups[*].requirements[*].course_options and prefix_patterns, unions them with MATH/STAT/ENGL (gen-ed staples), queries the Course table for every course in those departments, and parses each course's prerequisites_raw into a PrereqNode. Logs an ERROR if the resulting course set is empty so that missing seeds are loud, not silent.
+- Requirements loader (app/engine/requirements_loader.py): load_requirements_for_major(db, major, track) hits the majors table first (keyed by name + track, falling back to the General track if the specific track isn't seeded). On miss, logs a warning and rebuilds from the in-memory MAJOR_BUILDERS dict. On unknown major, logs a warning and returns CS. Results are cached in-process for one hour via a (major, track) keyed dict, avoiding repeated DB round-trips in the common case.
+- Requirement serialization helpers: requirements_to_dict / requirements_from_dict round-trip DegreeRequirements through JSONB so the same in-memory tree can be stored in Postgres, cached in Redis if desired, and reconstructed without loss.
+- Seed script (backend/scripts/seed_majors.py): walks MAJOR_BUILDERS, expands CS across its four tracks, and idempotently upserts each (name, catalog_year, track) row into the majors table. Safe to re-run after every catalog update.
 
 5.3 PlanetTerp & umd.io Integration
 Source | Endpoint / Method | Data Retrieved | Caching
@@ -93,8 +102,12 @@ Both integrations are wrapped in a circuit breaker (CLOSED -> OPEN -> HALF_OPEN 
 POST /api/recommendations returns ranked courses with explainable scoring. The engine is built as a Strategy pattern: each scoring dimension is a pluggable Scorer implementing BaseScorer. Scores are aggregated with user-adjustable weights, then normalized to sum to 1.0.
 
 The engine supports two goal modes set via the goal field:
-- "balanced" (default): uses the standard weight distribution below, sourcing candidates from the student's major prerequisite DAG.
+- "balanced" (default): uses the standard weight distribution below, sourcing candidates from the dynamic per-major prerequisite DAG built via CourseGraph.build_from_umd_catalog().
 - "easiest": sources candidates from the full UMD course catalog (all departments), auto-applies ease-oriented preference tags, and shifts weights heavily toward GPA and review-keyword matching. See Section 5.5 for details.
+
+Additional v3.1 fields on POST /api/recommendations:
+- show_prerequisites_only (bool, default false): when true, always restricts candidates to courses whose prerequisites the student has already satisfied — even in "easiest" mode, which would otherwise source from the full catalog. This is wired to a toggle in the recommendations-page sidebar.
+- Response shape additions: every RecommendationResponse now carries `section: "major_requirement" | "other_course"` and `fulfills_requirements: list[str]`. These are computed post-scoring by DegreeAuditor.classify_courses (app/engine/degree_audit.py), which maps each recommended course against unmet requirement groups using the same course_options / prefix_patterns / GenEd-tag rules as the audit engine. The frontend uses these fields to split the recommendation list into two sections ("Major Requirements" and "Other Courses") with per-card badges for the requirement groups each course would fulfill.
 
 Scorer | Default Weight (balanced) | Signal
 Requirement Fulfillment | 35% | How many unmet degree requirements this course satisfies
@@ -223,6 +236,7 @@ Cache Layer 3 | PostgreSQL cache_entries table | Durable fallback; survives Redi
 Auth | Browser localStorage (no account required) | Zero-friction: no sign-in required; all data persists in localStorage
 Background Jobs | Celery + Celery Beat | Nightly full sync, hourly delta sync, cache warming
 Message Broker | Redis (Celery broker) | Same Redis instance as cache
+Major catalog storage | Postgres majors table (JSONB requirements) | Seeded via backend/scripts/seed_majors.py; Alembic migration a1b2c3d4e5f6 drops the legacy degree_requirements table
 PDF Extraction | PyMuPDF (fitz) | Transcript PDF text extraction
 Sentiment Analysis | NLTK | Review keyword scoring for sentiment scorer
 Containerization | Docker + docker-compose | Postgres, Redis, backend, Celery worker/beat
@@ -230,11 +244,15 @@ Hosting (planned) | Vercel (frontend) + Railway/Render (backend) | Free-tier fri
 
 6.2 Backend Module Map
 Module | Path | Responsibility
-API routers | app/api/ | courses, recommendations, schedule, professors, auth, cart, wishlist, user
+API routers | app/api/ | courses, recommendations, schedule, professors, majors (v3.1), cart, wishlist, user
+Majors router | app/api/majors.py | GET /api/majors — lists seeded majors grouped by name with their available tracks (powers onboarding dropdown)
 Recommendation engine | app/engine/recommender.py | Scorer orchestration, weight normalization, explanation generation
 Scorers | app/engine/scorers/ | requirement, gpa, professor, sentiment, collaborative, schedule_fit, preference_tags
-DAG engine | app/engine/course_graph.py | Kahn's topo sort, cycle detection, reachability, path finding
-Degree auditor | app/engine/degree_audit.py | Requirement trees, audit result, highest-impact courses, unmet GenEd detection
+DAG engine | app/engine/course_graph.py | Kahn's topo sort, cycle detection, reachability, path finding, dynamic build_from_umd_catalog (v3.1) that derives department prefixes from loaded requirements
+Prerequisite parser | app/engine/prerequisite_parser.py | Parses umd.io prerequisite JSON (and/or/coreq/nested/string/list) into PrereqNode trees (v3.1)
+Requirements loader | app/engine/requirements_loader.py | DB-backed requirement loading with 1-hour TTL in-process cache, serialize/deserialize helpers, graceful fallback to in-memory builders then CS (v3.1)
+Degree auditor | app/engine/degree_audit.py | Requirement trees, audit result, highest-impact courses, unmet GenEd detection, classify_courses for section grouping (v3.1)
+Majors model | app/models/major.py | SQLAlchemy model for the majors table (name, code, catalog_year, track, requirements JSONB); unique on (name, catalog_year, track), indexed on name
 Schedule solver | app/engine/schedule_solver.py | CSP backtracking, forward checking, preference scoring
 Interval tree | app/engine/interval_tree.py | O(log n) time-conflict detection for schedule building
 Planner | app/engine/planner.py | Multi-semester graduation plan generator
@@ -251,9 +269,9 @@ ETL | app/workers/etl/ | planetterp_etl.py, umdio_etl.py — bulk and incrementa
 Route | Component | Purpose
 / | page.tsx | Landing / home page
 /login | layout.tsx | No login (localStorage)
-/onboarding | onboarding/page.tsx | Major selection + initial course history input
+/onboarding | onboarding/page.tsx | Dynamic major/track dropdown sourced from GET /api/majors (v3.1) + course history / transcript input; shows amber warning when transcript parser detects a major absent from the seeded catalog
 /dashboard | dashboard/page.tsx | Degree progress overview, quick stats
-/recommendations | recommendations/page.tsx | Ranked course list with Goal selector, weight sliders, preference tags, and filters
+/recommendations | recommendations/page.tsx | Ranked course list with Goal selector, weight sliders, preference tags, filters, prerequisite-only toggle (v3.1), and results grouped into "Major Requirements" vs "Other Courses" sections (v3.1) with fulfilled-requirement badges per card
 /course/[id] | course/[id]/page.tsx | Full course detail (GPA chart, reviews, prereqs, sections)
 /professor/[slug] | professor/[slug]/page.tsx | Professor profile with ratings and course list
 /schedule | schedule/page.tsx | CSP schedule builder with calendar preview
@@ -262,9 +280,10 @@ Route | Component | Purpose
 Key shared components: CourseCard, WeightSliders (disabled in Easiest mode), GoalSelector (Balanced / Easiest Classes toggle), CalendarView (week-grid), ProgressTracker (degree audit visualization), CartDrawer, CourseSearch (autocomplete), Badge, ProgressBar, Slider.
 
 6.4 Data Flow
+0. (v3.1) Onboarding fetches GET /api/majors once on mount and populates the major dropdown; the student's selected major drives the track dropdown dynamically. Transcript-detected majors that don't exist in the seeded catalog trigger an amber "not in our catalog" warning and force a dropdown pick.
 1. Student opens TerpAdvisor — no sign-in required. Onboarding collects major, track, optional minor, and course history (or transcript upload). All data is persisted to browser localStorage.
-2. Frontend calls POST /api/audit -> backend builds requirement tree, runs degree audit, returns progress %.
-3. Frontend calls POST /api/recommendations with the selected goal ("balanced" or "easiest") -> backend resolves candidate courses (DAG or full catalog), applies filters, scores via all 7 scorers with appropriate weights, returns ranked list with explanations.
+2. Frontend calls POST /api/audit -> backend loads requirements from the majors table via load_requirements_for_major (1-hour TTL cache, falls back to in-memory MAJOR_BUILDERS on miss, then to CS as a last resort), runs degree audit, returns progress %.
+3. Frontend calls POST /api/recommendations with the selected goal ("balanced" or "easiest") -> backend dynamically builds the per-major course graph via CourseGraph.build_from_umd_catalog (derives department prefixes from the loaded requirements), resolves candidate courses (DAG or full catalog), applies filters, scores via all 7 scorers, then classifies each recommendation via DegreeAuditor.classify_courses so the response carries section + fulfills_requirements fields.
    - In "easiest" mode, backend also runs an internal audit to detect unmet GenEds and narrows candidates accordingly.
 4. Student adjusts weight sliders or filters -> frontend re-calls /api/recommendations with updated params (sliders are disabled in Easiest mode since weights are auto-managed).
 5. Student adds courses to cart -> POST /api/schedule/generate -> CSP solver finds conflict-free schedules ranked by preferences.
@@ -290,12 +309,14 @@ sections | section_id, course_id, professor_id, semester, days, start_time, end_
 cart_items | id, user_id, course_id, section_id, added_at | Per-user cart for current semester
 wishlist_items | id, user_id, course_id, added_at | Saved courses for future semesters
 cache_entries | key (PK), value (JSON), expires_at, created_at | Postgres-backed cache tier 3
+majors (v3.1) | id, name, code, catalog_year, track, requirements (JSONB), created_at, updated_at | Seeded degree requirements keyed by (name, catalog_year, track); unique on those three columns; indexed on name. Migration a1b2c3d4e5f6 creates this table and drops the legacy degree_requirements table.
 
-Note: Degree requirements are built in-memory from Python code (app/engine/degree_audit.py), not stored in the DB. This makes requirement logic version-controllable and easy to update per catalog year without migrations.
+Note (v3.1): Degree requirements now live in the majors table, seeded from the in-memory MAJOR_BUILDERS via backend/scripts/seed_majors.py (idempotent upsert). The in-memory builders remain as a last-resort fallback in app/engine/requirements_loader.py so the service degrades gracefully when the table is unseeded or a major is missing. Adding a new major is a data change, not a code change.
 
 8. API Endpoints
 Method | Path | Description
 GET | /api/health | Health check (DB + Redis connectivity)
+GET | /api/majors | (v3.1) List all seeded majors with their available tracks (powers onboarding dropdown)
 GET | /api/courses/search | Search courses by name or ID (autocomplete)
 GET | /api/courses/:id | Full course detail with GPA, reviews, prereqs, sections
 GET | /api/courses/:id/grades | Grade distribution from PlanetTerp
@@ -318,7 +339,8 @@ GET/PUT | /api/user | User profile (major, minor, preferences)
 9.1 First-Time Setup
 1. Student lands on homepage -> clicks "Get Started"
 2. No login step — app is immediately accessible
-3. Onboarding: selects major (+ optional track and minor), enters or uploads transcript
+3. Onboarding: selects major from a dropdown sourced from GET /api/majors (v3.1); track dropdown updates dynamically based on the chosen major; enters optional minor; uploads transcript
+   - If the transcript parser detects a major name not in the seeded catalog, an amber warning is shown and the student must pick the closest match from the dropdown.
 4. System parses transcript (text or PDF), extracts completed courses with credits and gen-eds
 5. POST /api/audit runs -> student sees degree progress dashboard
 6. POST /api/recommendations runs -> first personalized recommendation feed (Balanced mode by default)
@@ -403,7 +425,15 @@ Multi-semester planner | Done | Topo-sort + greedy semester assignment
 Cart & wishlist APIs | Done |
 Celery ETL (full sync + delta sync) | Done | Nightly full, hourly delta
 Event bus for cache invalidation | Done | In-process pub/sub
-63-test suite | Done (v3.0) | 63 passing tests (up from 59); 4 new tests for Easiest mode and new tags
+Dynamic per-major course graph (build_from_umd_catalog) | Done (v3.1) | Replaces 5 hardcoded builders; derives dept prefixes from loaded requirements; ~250 LOC deleted from api/recommendations.py
+Prerequisite parser (umd.io JSON -> PrereqNode) | Done (v3.1) | Handles null/string/list/and/or/coreq/nested structures
+majors table + Alembic migration | Done (v3.1) | Migration a1b2c3d4e5f6; drops legacy degree_requirements table
+Requirements loader (DB-backed + TTL cache) | Done (v3.1) | 1-hour in-process cache; in-memory fallback on DB miss; CS last-resort fallback
+seed_majors.py script | Done (v3.1) | Idempotent upsert by (name, catalog_year, track)
+Recommendation sections + fulfills_requirements | Done (v3.1) | classify_courses in degree_audit.py; response carries section + requirement badges
+show_prerequisites_only filter on /api/recommendations | Done (v3.1) | Overrides easiest mode; restricts candidates to courses with satisfied prereqs
+/api/majors endpoint | Done (v3.1) | Grouped by name with unique track list
+84-test suite | Done (v3.1) | 84 passing tests (up from 63); +21 tests covering requirements loader, dynamic graph, classify_courses, and /api/majors endpoint
 
 10.2 Frontend — Complete
 Page / Component | Status
@@ -414,6 +444,10 @@ Recommendations page + weight sliders | Done
 Goal selector (Balanced / Easiest Classes) | Done (v3.0)
 Sliders disabled + helper note in Easiest mode | Done (v3.0)
 New preference tags (online, no-attendance, easy-a, light-workload) | Done (v3.0)
+Onboarding dropdown (dynamic majors/tracks via GET /api/majors) | Done (v3.1)
+Recommendations section grouping (Major Requirements / Other Courses) | Done (v3.1)
+Prerequisite-only toggle on recommendations | Done (v3.1)
+Transcript detected-unknown-major amber warning | Done (v3.1)
 Course detail page | Done
 Professor detail page | Done
 Schedule builder + calendar view | Done
@@ -429,7 +463,9 @@ Seat-opening push notifications | Stretch | Would require WebSocket or polling +
 Social schedule sharing | Stretch | Privacy implications; post-MVP
 Community review upvotes | Stretch | Helpful votes on PlanetTerp review excerpts
 Mobile app (React Native) | Stretch | Post-launch if adoption warrants it
-Broader major coverage (20+ majors) | Stretch | 6 majors currently
+Broader major coverage (20+ majors) | Unblocked (v3.1) | Dynamic catalog means any major added to the majors table works end-to-end with no code changes; only seeding effort remains
+Manual end-to-end walkthrough of v3.1 onboarding + INST recommendations | Pending | Requires live backend + seeded DB + browser; not automatable from the agent
+Live ASGI test fixtures (httpx.AsyncClient + dependency_overrides) | Deferred | Blocked by Postgres-only column types in models (JSONB, UUID); current API tests use the FakeDB pattern (see tests/api/test_majors.py)
 Easiest mode min-GPA hard filter | Open | Expose a min_gpa threshold specifically for Easiest mode in the UI
 
 11. Risks & Mitigations
@@ -466,7 +502,7 @@ Milestone | Target | Key Deliverables
 Production deployment | Week 1-2 | Vercel frontend, Railway backend, Postgres + Redis provisioned, env vars, domain
 Beta launch | Week 3 | Soft launch to UMD CS community, r/UMD post, Discord announcement
 Feedback iteration | Week 4-6 | Address UX bugs, requirement mapping corrections, performance tuning
-Broader major coverage | Week 7-8 | Expand from 6 to 10+ majors based on demand
+Broader major coverage | Week 7-8 | Seed 10+ additional majors into the majors table via the existing seed_majors.py pattern (engine work unblocked in v3.1)
 Stretch features | Week 9+ | Seat notifications, social sharing, mobile if warranted
 
-End of Document — TerpAdvisor v3.0 | April 2026
+End of Document — TerpAdvisor v3.1 | April 2026

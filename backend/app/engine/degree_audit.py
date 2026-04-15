@@ -290,6 +290,51 @@ class DegreeAuditor:
         ranked = sorted(impact.items(), key=lambda x: x[1], reverse=True)
         return ranked[:top_n]
 
+    def classify_courses(
+        self,
+        course_ids: list[str],
+        completed: set[str],
+        course_gen_eds: dict[str, list[str]] | None = None,
+    ) -> dict[str, list[str]]:
+        """Map each course to the requirement group ids it would help fulfill.
+
+        Only groups containing at least one *unmet* requirement that the course
+        matches are included. Reuses the same matching rules as
+        ``_audit_requirement``: explicit ``course_options``, ``prefix_patterns``,
+        and GenEd tag expansion.
+        """
+        result: dict[str, list[str]] = {cid: [] for cid in course_ids}
+
+        for group in self.requirements.groups:
+            for req in group.requirements:
+                completed_in_req = [c for c in req.course_options if c in completed]
+                if req.prefix_patterns:
+                    for cid in completed:
+                        if cid not in completed_in_req and any(
+                            cid.startswith(p) for p in req.prefix_patterns
+                        ):
+                            completed_in_req.append(cid)
+                if len(completed_in_req) >= req.courses_needed:
+                    continue
+
+                gened_codes: set[str] = set()
+                if req.type == RequirementType.GENED:
+                    gened_codes = {c.upper() for c in req.id.split("_")[1:]}
+
+                for cid in course_ids:
+                    if cid in completed:
+                        continue
+                    matches = cid in req.course_options
+                    if not matches and req.prefix_patterns:
+                        matches = any(cid.startswith(p) for p in req.prefix_patterns)
+                    if not matches and gened_codes and course_gen_eds:
+                        tags = course_gen_eds.get(cid) or []
+                        matches = any(t.upper() in gened_codes for t in tags)
+                    if matches and group.id not in result[cid]:
+                        result[cid].append(group.id)
+
+        return result
+
 
 # ──────────────────────────────────────────────
 # CS Major Requirements (UMD)

@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import CourseSearch from "@/components/CourseSearch";
-import { courseApi } from "@/lib/api";
+import { courseApi, majorsApi } from "@/lib/api";
 import { updateProfile, bulkAddCompletedCourses, setState } from "@/lib/userStore";
-import type { CourseDetail, TranscriptParseResult } from "@/types";
+import type { CourseDetail, MajorSummary, TranscriptParseResult } from "@/types";
 
 type InputMode = "search" | "paste" | "upload";
 
@@ -13,10 +13,14 @@ export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(1);
   const [major, setMajor] = useState("");
-  const [majorConfirmed, setMajorConfirmed] = useState(false); // Helper for validation
   const [majorDetected, setMajorDetected] = useState(false);
   const [track, setTrack] = useState("General");
   const [minor, setMinor] = useState("");
+  const [majors, setMajors] = useState<MajorSummary[]>([]);
+  const [majorsLoading, setMajorsLoading] = useState(true);
+  const [majorsError, setMajorsError] = useState<string | null>(null);
+  const [detectedUnknown, setDetectedUnknown] = useState<string | null>(null);
+  const [pendingDetectedMajor, setPendingDetectedMajor] = useState<string | null>(null);
   const [courses, setCourses] = useState<Array<{ course_id: string; name: string }>>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +42,37 @@ export default function OnboardingPage() {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    majorsApi
+      .list()
+      .then((data) => {
+        if (cancelled) return;
+        const sorted = [...data].sort((a, b) => a.name.localeCompare(b.name));
+        setMajors(sorted);
+        setMajorsError(null);
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setMajorsError(e instanceof Error ? e.message : "Failed to load majors");
+      })
+      .finally(() => {
+        if (!cancelled) setMajorsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedMajor = majors.find((m) => m.name === major);
+  const availableTracks = selectedMajor?.tracks.length ? selectedMajor.tracks : ["General"];
+
+  useEffect(() => {
+    if (!availableTracks.includes(track)) {
+      setTrack(availableTracks[0]);
+    }
+  }, [major, availableTracks, track]);
+
   const handleAddCourse = (course: CourseDetail) => {
     if (courses.some((c) => c.course_id === course.course_id)) return;
     setCourses((prev) => [...prev, { course_id: course.course_id, name: course.name }]);
@@ -51,10 +86,25 @@ export default function OnboardingPage() {
     setParseResult(result);
     setParsedChecked(new Set(result.courses.map((c) => c.course_id)));
     if (result.major) {
-      setMajor(result.major);
-      setMajorDetected(true);
+      setPendingDetectedMajor(result.major);
     }
   }
+
+  useEffect(() => {
+    if (!pendingDetectedMajor || majorsLoading) return;
+    const match = majors.find(
+      (m) => m.name.toLowerCase() === pendingDetectedMajor.toLowerCase(),
+    );
+    if (match) {
+      setMajor(match.name);
+      setMajorDetected(true);
+      setDetectedUnknown(null);
+    } else {
+      setDetectedUnknown(pendingDetectedMajor);
+      setMajorDetected(false);
+    }
+    setPendingDetectedMajor(null);
+  }, [pendingDetectedMajor, majors, majorsLoading]);
 
   async function handleParse() {
     setPasteError(null);
@@ -107,6 +157,7 @@ export default function OnboardingPage() {
   }
 
   function handleAddParsed() {
+    console.log("[onboarding] add-parsed click", { parsedCheckedSize: parsedChecked.size, hasParseResult: !!parseResult });
     if (!parseResult) return;
     const selectedCourses = parseResult.courses.filter((c) => parsedChecked.has(c.course_id));
     if (selectedCourses.length === 0) return;
@@ -361,7 +412,7 @@ export default function OnboardingPage() {
           {(inputMode === "paste" || inputMode === "upload") && parseResult && (
             <div className="mt-4 rounded-xl border border-[var(--border-dark)] overflow-hidden">
               {/* Header */}
-              <div className="p-4 border-b border-[var(--border-dark)] bg-green-500/10/50">
+              <div className="p-4 border-b border-[var(--border-dark)] bg-green-500/10">
                 <p className="text-sm font-semibold text-green-200 flex items-center gap-2">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
@@ -498,6 +549,7 @@ export default function OnboardingPage() {
           <div className="mt-6">
             <button
               onClick={() => {
+                console.log("[onboarding] continue click", { step, hasParseResult: !!parseResult, parsedCheckedSize: parsedChecked.size, coursesLen: courses.length });
                 if (parseResult && parsedChecked.size > 0) handleAddParsed();
                 setStep(2);
               }}
@@ -527,14 +579,34 @@ export default function OnboardingPage() {
                   <span className="ml-2 text-green-600 font-normal">· detected from transcript</span>
                 )}
               </label>
-              <input
-                type="text"
-                autoComplete="off"
+              <select
                 value={major}
-                onChange={(e) => { setMajor(e.target.value); setMajorDetected(false); }}
-                placeholder="e.g., Computer Science"
-                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-dark)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)]"
-              />
+                onChange={(e) => {
+                  setMajor(e.target.value);
+                  setMajorDetected(false);
+                  setDetectedUnknown(null);
+                }}
+                disabled={majorsLoading || majors.length === 0}
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-dark)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)] bg-[var(--bg-secondary)] disabled:opacity-50"
+              >
+                <option value="">
+                  {majorsLoading ? "Loading majors..." : "Select your major"}
+                </option>
+                {majors.map((m) => (
+                  <option key={m.name} value={m.name}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              {majorsError && (
+                <p className="text-xs text-red-500 mt-1">{majorsError}</p>
+              )}
+              {detectedUnknown && (
+                <p className="text-xs text-amber-500 mt-1">
+                  We detected &ldquo;{detectedUnknown}&rdquo; from your transcript, but it
+                  isn&rsquo;t in our catalog yet. Please pick the closest match above.
+                </p>
+              )}
             </div>
 
             <div>
@@ -542,13 +614,14 @@ export default function OnboardingPage() {
               <select
                 value={track}
                 onChange={(e) => setTrack(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-dark)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)] bg-[var(--bg-secondary)]"
+                disabled={!major}
+                className="w-full px-4 py-2.5 rounded-lg border border-[var(--border-dark)] text-sm focus:outline-none focus:ring-2 focus:ring-[var(--umd-red)]/20 focus:border-[var(--umd-red)] bg-[var(--bg-secondary)] disabled:opacity-50"
               >
-                <option value="General">General</option>
-                <option value="Cybersecurity">Cybersecurity</option>
-                <option value="Data Science">Data Science</option>
-                <option value="Machine Learning">Machine Learning</option>
-                <option value="Quantum Information">Quantum Information</option>
+                {availableTracks.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
               </select>
             </div>
 

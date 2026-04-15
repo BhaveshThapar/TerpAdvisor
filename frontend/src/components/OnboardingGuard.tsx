@@ -21,8 +21,6 @@ export default function OnboardingGuard({ children }: { children: React.ReactNod
     if (!onboarded && pathname !== "/onboarding") {
       setToastMessage("Please complete onboarding first.");
       router.replace("/onboarding");
-    } else if (onboarded && pathname === "/onboarding") {
-      router.replace("/dashboard");
     }
   }, [hydrated, onboarded, pathname, router]);
 
@@ -34,8 +32,7 @@ export default function OnboardingGuard({ children }: { children: React.ReactNod
 
   const blocked =
     !hydrated ||
-    (!onboarded && pathname !== "/onboarding") ||
-    (onboarded && pathname === "/onboarding");
+    (!onboarded && pathname !== "/onboarding");
 
   return (
     <>

@@ -8,6 +8,7 @@
 import type {
   AuditResult,
   CourseDetail,
+  MajorSummary,
   MultiSemesterPlan,
   ProfessorDetail,
   RecommendationList,
@@ -71,6 +72,7 @@ export const recommendationApi = {
     preferenceTags?: string[],
     filters?: UserPreferences["filters"],
     goal: "balanced" | "easiest" = "balanced",
+    showPrerequisitesOnly: boolean = false,
   ) =>
     fetchApi<RecommendationList>("/recommendations", {
       method: "POST",
@@ -83,6 +85,7 @@ export const recommendationApi = {
         preference_tags: preferenceTags,
         filters: filters,
         goal,
+        show_prerequisites_only: showPrerequisitesOnly,
       }),
     }),
 };
@@ -138,6 +141,10 @@ export const professorApi = {
 };
 
 // ── Plan ──────────────────────────────────────
+export const majorsApi = {
+  list: () => fetchApi<MajorSummary[]>("/majors"),
+};
+
 export const planApi = {
   generate: (
     completedCourses: string[],
