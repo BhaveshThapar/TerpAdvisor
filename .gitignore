@@ -35,6 +35,7 @@ pgdata/
 .claude/settings.local.json
 .agents/
 .claude/
+.goose/
 
 # Python virtualenv and local DBs
 venv/
