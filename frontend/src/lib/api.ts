@@ -26,7 +26,18 @@ async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
     ...options,
   });
   if (!res.ok) {
-    throw new Error(`API error: ${res.status} ${res.statusText}`);
+    // Surface FastAPI's `detail` message when present so users see
+    // "No timetable sections found for: CMSC499" instead of "API error: 500".
+    let message = `API error: ${res.status} ${res.statusText}`;
+    try {
+      const body = await res.json();
+      if (typeof body?.detail === "string" && body.detail.length > 0) {
+        message = body.detail;
+      }
+    } catch {
+      // Non-JSON error body — keep the generic message.
+    }
+    throw new Error(message);
   }
   return res.json();
 }

@@ -28,7 +28,11 @@ from app.models.major import Major
 logger = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 3600
-_cache: dict[tuple[str, str], tuple[DegreeRequirements, float]] = {}
+# Cache stores the *dict* form, never live DegreeRequirements objects.
+# Each call to load_requirements_for_major() rebuilds a fresh object so
+# callers can mutate their copy (e.g. /audit's minor_prefix injection)
+# without leaking state into other requests. See test_requirements_loader.
+_cache: dict[tuple[str, str], tuple[dict[str, Any], float]] = {}
 
 
 def requirements_to_dict(reqs: DegreeRequirements) -> dict[str, Any]:
@@ -111,12 +115,16 @@ def _build_from_memory(major: str, track: str) -> DegreeRequirements:
 async def load_requirements_for_major(
     db: AsyncSession, major: str, track: str = "General"
 ) -> DegreeRequirements:
-    """Load requirements for a major/track, caching results for an hour."""
+    """Load requirements for a major/track, caching results for an hour.
+
+    Returns a *fresh* DegreeRequirements object on every call (built from a
+    cached dict), so endpoint-level mutations can never leak across requests.
+    """
     cache_key = (major, track)
     cached = _cache.get(cache_key)
     now = time.time()
     if cached and cached[1] > now:
-        return cached[0]
+        return requirements_from_dict(cached[0])
 
     result = await db.execute(
         select(Major).where(Major.name == major, Major.track == track)
@@ -130,17 +138,17 @@ async def load_requirements_for_major(
         row = result.scalar_one_or_none()
 
     if row is not None:
-        reqs = requirements_from_dict(row.requirements)
+        reqs_dict = row.requirements
     else:
         logger.warning(
             "majors table miss for major=%r track=%r; using in-memory builder",
             major,
             track,
         )
-        reqs = _build_from_memory(major, track)
+        reqs_dict = requirements_to_dict(_build_from_memory(major, track))
 
-    _cache[cache_key] = (reqs, now + _CACHE_TTL_SECONDS)
-    return reqs
+    _cache[cache_key] = (reqs_dict, now + _CACHE_TTL_SECONDS)
+    return requirements_from_dict(reqs_dict)
 
 
 def clear_cache() -> None:

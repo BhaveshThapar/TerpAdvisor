@@ -33,7 +33,9 @@ Each recommendation returns a full explanation breakdown and a one-sentence top 
 
 **Multi-semester planner** — Topological sort over remaining required courses, greedily packed into semesters respecting credit caps and prerequisite ordering. Returns labeled semesters with warnings for unresolvable prereqs.
 
-**Course detail** — GPA, full grade distribution, professor ratings, student reviews, prerequisites with your completion status, and section times — all from PlanetTerp and umd.io, cached in a three-tier store.
+**Course detail** — GPA, full grade distribution, professor ratings, student reviews, prerequisites with your completion status, and section times — all from PlanetTerp and umd.io. Grade distributions are cached for 24h in the three-tier store so detail views don't re-hit PlanetTerp.
+
+**Caching** — `/api/recommendations` responses are served through a multi-layer cache (in-process LRU → Redis → Postgres) keyed on the full request payload, with XFetch probabilistic early-expiry and a Redis lock for stampede protection. Cache-layer failures fail open to direct computation, so the API works even with Redis down. A Celery beat task pre-warms cold-start queries for popular majors every 6 hours.
 
 ---
 

@@ -105,3 +105,30 @@ class TestLoader:
         await load_requirements_for_major(db, "Computer Science", "General")
         await load_requirements_for_major(db, "Computer Science", "General")
         assert db.calls == 1
+
+    @pytest.mark.asyncio
+    async def test_cached_objects_are_isolated_between_calls(self):
+        """Regression: /audit mutates ulc prefix_patterns for minor injection.
+
+        The loader used to cache and return the *same* DegreeRequirements
+        object, so one user's minor prefixes leaked into every other user's
+        audit for the cache TTL. Each call must now return a fresh object.
+        """
+        cs = build_cs_requirements()
+        db = _FakeDB([_FakeMajorRow(requirements_to_dict(cs))])
+
+        # Request 1: simulate /audit injecting a MATH minor into the ULC req.
+        first = await load_requirements_for_major(db, "Computer Science", "General")
+        ulc_group = next(g for g in first.groups if g.id == "ulc")
+        ulc_group.requirements[0].prefix_patterns.extend(["MATH3", "MATH4"])
+        first.groups[0].requirements[0].course_options.append("FAKE999")
+
+        # Request 2: a different user with no minor must see pristine data.
+        second = await load_requirements_for_major(db, "Computer Science", "General")
+        assert second is not first
+        ulc_second = next(g for g in second.groups if g.id == "ulc")
+        assert "MATH3" not in ulc_second.requirements[0].prefix_patterns
+        assert "MATH4" not in ulc_second.requirements[0].prefix_patterns
+        assert "FAKE999" not in second.groups[0].requirements[0].course_options
+        # Still served from cache — no extra DB round-trip.
+        assert db.calls == 1

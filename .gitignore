@@ -33,6 +33,7 @@ pgdata/
 # Misc
 *.log
 .claude/settings.local.json
+.agents/
 
 # Python virtualenv and local DBs
 venv/

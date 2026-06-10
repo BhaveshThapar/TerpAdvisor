@@ -1,9 +1,12 @@
 """Recommendation and degree audit API endpoints."""
 
+import re
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.cache.service import cached, make_key
 from app.db.session import get_db
 from app.engine.course_graph import CourseGraph, CourseNode, PrereqNode, PrereqType
 from app.engine.degree_audit import DegreeAuditor, build_cs_requirements
@@ -11,7 +14,7 @@ from app.engine.requirements_loader import load_requirements_for_major
 from app.engine.planner import PlanGenerator
 from app.engine.recommender import RecommendationEngine
 from app.engine.scorers.base import ScoringContext
-from app.models import Course, Professor, Review
+from app.models import Course, Professor, Review, Section
 from app.schemas.schemas import (
     AuditRequest,
     AuditResponse,
@@ -42,6 +45,7 @@ async def _get_completed_credits(
     values for courses that may not be in the DB or may have wrong DB values.
     """
     completed: dict[str, int] = {}
+    needs_db_lookup: list[str] = []
     for course_id in completed_course_ids:
         # Transcript-provided override is authoritative
         if credit_overrides and course_id in credit_overrides:
@@ -57,13 +61,23 @@ async def _get_completed_credits(
             except (IndexError, ValueError):
                 pass
 
-        course_result = await db.execute(
-            select(Course.credits).where(Course.course_id == course_id)
+        needs_db_lookup.append(course_id)
+
+    # Single batched query instead of one round-trip per course (N+1).
+    db_credits: dict[str, int] = {}
+    if needs_db_lookup:
+        rows = await db.execute(
+            select(Course.course_id, Course.credits).where(
+                Course.course_id.in_(needs_db_lookup)
+            )
         )
-        db_credits = course_result.scalar_one_or_none()
+        db_credits = {row.course_id: row.credits for row in rows.all()}
+
+    for course_id in needs_db_lookup:
+        credits = db_credits.get(course_id)
         # Use 0 rather than a 3-credit guess for courses absent from the DB.
         # The frontend should supply credit_overrides for such courses.
-        completed[course_id] = db_credits if db_credits is not None else 0
+        completed[course_id] = credits if credits is not None else 0
     return completed
 
 
@@ -73,6 +87,21 @@ async def _build_scoring_context(
     preference_tags: list[str] | None = None,
 ) -> ScoringContext:
     """Build scoring context with real data from DB."""
+    # Map professors to courses via sections so the professor scorer sees
+    # real instructor data (previously hardcoded to [] — the scorer was a
+    # no-op and the professor weight slider did nothing).
+    course_profs: dict[str, set[str]] = {}
+    prof_names: set[str] = set()
+    if available:
+        section_rows = await db.execute(
+            select(Section.course_id, Professor.name)
+            .join(Professor, Section.professor_id == Professor.id)
+            .where(Section.course_id.in_(available))
+        )
+        for sec_course_id, prof_name in section_rows.all():
+            course_profs.setdefault(sec_course_id, set()).add(prof_name)
+            prof_names.add(prof_name)
+
     # Fetch course data
     course_data = {}
     if available:
@@ -84,16 +113,20 @@ async def _build_scoring_context(
                 "credits": c.credits,
                 "gen_eds": c.gen_eds or [],
                 "sections": [],
-                "professors": [],
+                "professors": sorted(course_profs.get(c.course_id, set())),
             }
 
-    # Fetch professor data
+    # Fetch only professors who actually teach the candidate courses
+    # (previously loaded the entire professors table on every request).
     professor_data = {}
-    prof_result = await db.execute(select(Professor))
-    for p in prof_result.scalars().all():
-        professor_data[p.name] = {
-            "avg_rating": p.avg_rating, "review_count": p.review_count,
-        }
+    if prof_names:
+        prof_result = await db.execute(
+            select(Professor).where(Professor.name.in_(prof_names))
+        )
+        for p in prof_result.scalars().all():
+            professor_data[p.name] = {
+                "avg_rating": p.avg_rating, "review_count": p.review_count,
+            }
 
     # Fetch review data for available courses
     review_data: dict[str, list] = {}
@@ -142,13 +175,17 @@ def _apply_filters(
         depts = {d.upper() for d in filters.departments}
         filtered = [c for c in filtered if (course_data.get(c, {}).get("department") or "").upper() in depts]
     
-    # Level filter (e.g., 100, 200)
+    # Level filter (e.g., 100, 200) — match the FIRST digit of the course
+    # number. The old `any(char in lvls for char in c)` matched a level digit
+    # anywhere in the ID, so a 100-level filter wrongly kept CMSC216/351/416.
     if filters.levels:
         lvls = {str(lvl)[0] for lvl in filters.levels}
-        filtered = [
-            c for c in filtered
-            if any(char.isdigit() and char in lvls for char in c)
-        ]
+
+        def _level_digit(cid: str) -> str | None:
+            m = re.search(r"\d", cid)
+            return m.group() if m else None
+
+        filtered = [c for c in filtered if _level_digit(c) in lvls]
         
     # GenEd filter
     if filters.gen_eds:
@@ -159,10 +196,10 @@ def _apply_filters(
         ]
         
     if filters.min_credits is not None:
-        filtered = [c for c in filtered if course_data.get(c, {}).get("credits", 3) >= filters.min_credits]
+        filtered = [c for c in filtered if (course_data.get(c, {}).get("credits") or 3) >= filters.min_credits]
         
     if filters.max_credits is not None:
-        filtered = [c for c in filtered if course_data.get(c, {}).get("credits", 3) <= filters.max_credits]
+        filtered = [c for c in filtered if (course_data.get(c, {}).get("credits") or 3) <= filters.max_credits]
         
     # GPA filter - Strict exclusion
     if filters.min_gpa is not None:
@@ -185,9 +222,13 @@ def _apply_filters(
     return filtered
 
 
-@router.post("/recommendations", response_model=RecommendationListResponse)
-async def get_recommendations(body: RecommendationRequest, db: AsyncSession = Depends(get_db)):
-    """Get personalized course recommendations."""
+async def _compute_recommendations(body: RecommendationRequest, db: AsyncSession) -> dict:
+    """Run the full recommendation pipeline.
+
+    Returns a JSON-serialisable dict in the RecommendationListResponse shape
+    so the result can be stored in the multi-layer cache and shared with the
+    Celery cache-warming task.
+    """
     completed_credits = await _get_completed_credits(body.completed_courses, db)
     completed = set(completed_credits.keys())
     major = body.major or "Computer Science"
@@ -337,6 +378,24 @@ async def get_recommendations(body: RecommendationRequest, db: AsyncSession = De
         ],
         total_candidates=result.total_candidates,
         weights_used=result.weights_used,
+    ).model_dump()
+
+
+@router.post("/recommendations", response_model=RecommendationListResponse)
+async def get_recommendations(body: RecommendationRequest, db: AsyncSession = Depends(get_db)):
+    """Get personalized course recommendations.
+
+    Responses are served through the multi-layer cache (LRU -> Redis ->
+    Postgres) with XFetch stampede protection, keyed on the full request
+    payload. TTL is 15 minutes; cache-layer failures fall back to direct
+    computation so the endpoint works even without Redis.
+    """
+    key = make_key("rec", body.model_dump())
+    return await cached(
+        key,
+        lambda: _compute_recommendations(body, db),
+        ttl=900,
+        delta=1.5,
     )
 
 
@@ -367,7 +426,9 @@ async def get_degree_audit(body: AuditRequest, db: AsyncSession = Depends(get_db
 
     requirements = await load_requirements_for_major(db, major, body.track or "General")
 
-    # If the student declared a minor, inject its department prefixes into the ULC requirement
+    # If the student declared a minor, inject its department prefixes into the
+    # ULC requirement. Mutating in place is safe: load_requirements_for_major
+    # returns a fresh object per call (the cache stores dicts, not objects).
     if body.minor_prefix:
         ulc_group = next((g for g in requirements.groups if g.id == "ulc"), None)
         if ulc_group:

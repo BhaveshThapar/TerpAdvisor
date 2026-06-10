@@ -94,12 +94,56 @@ def delta_sync(self):
 
 @celery_app.task
 def warm_cache():
-    """Pre-compute and cache popular queries."""
+    """Pre-compute and cache recommendation responses for popular queries.
+
+    Runs the same pipeline as POST /api/recommendations and writes results
+    into the shared multi-layer cache (Redis + Postgres layers are visible
+    to the API process), so cold-start requests for popular majors are
+    served from cache. Uses a dedicated NullPool engine because each Celery
+    invocation runs in its own event loop.
+    """
+    import asyncio
+
+    async def _warm() -> dict:
+        import redis.asyncio as aioredis
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+        from sqlalchemy.pool import NullPool
+
+        from app.api.recommendations import _compute_recommendations
+        from app.cache.service import build_cache, cached, make_key
+        from app.config import settings
+        from app.schemas.schemas import RecommendationRequest
+
+        engine = create_async_engine(settings.database_url, poolclass=NullPool)
+        session_factory = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        redis_client = aioredis.from_url(settings.redis_url)
+        cache = build_cache(redis_client=redis_client, session_factory=session_factory)
+
+        popular_majors = ["Computer Science", "Information Science", "Mathematics"]
+        warmed: list[str] = []
+        try:
+            for major in popular_majors:
+                # The cold-start request every new user fires after onboarding.
+                body = RecommendationRequest(major=major)
+                key = make_key("rec", body.model_dump())
+                async with session_factory() as db:
+                    await cached(
+                        key,
+                        lambda: _compute_recommendations(body, db),
+                        ttl=900,
+                        delta=1.5,
+                        cache=cache,
+                    )
+                warmed.append(major)
+        finally:
+            await redis_client.aclose()
+            await engine.dispose()
+        return {"majors_warmed": len(warmed), "majors": warmed}
+
     logger.info("Starting cache warming")
-    # In production: pre-compute recommendations for popular majors/course histories
-    popular_majors = ["Computer Science", "Information Science", "Mathematics"]
-    logger.info(f"Cache warming complete for {len(popular_majors)} majors")
-    return {"majors_warmed": len(popular_majors)}
+    result = asyncio.run(_warm())
+    logger.info(f"Cache warming complete: {result}")
+    return result
 
 
 @celery_app.task(bind=True, max_retries=2)

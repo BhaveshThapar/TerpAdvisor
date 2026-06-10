@@ -8,6 +8,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.cache.service import cached
 from app.db.session import get_db
 from app.engine.requirements_loader import load_requirements_for_major
 from app.models import Course, Professor, Review
@@ -35,6 +36,21 @@ async def _fetch_umdio_course(course_id: str) -> dict | None:
 
 
 async def _fetch_planetterp_grades(course_id: str) -> dict[str, int]:
+    """Grade distribution for a course, served through the multi-layer cache.
+
+    Grade data changes once a semester at most, so a 24h TTL avoids hitting
+    PlanetTerp on every course-detail view. Falls back to a live fetch when
+    the cache layers are unavailable.
+    """
+    return await cached(
+        f"grades:{course_id}",
+        lambda: _fetch_planetterp_grades_live(course_id),
+        ttl=86400,
+        delta=0.5,
+    )
+
+
+async def _fetch_planetterp_grades_live(course_id: str) -> dict[str, int]:
     """Fetch and aggregate grade distribution from PlanetTerp across all semesters."""
     grade_keys = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-",
                   "D+", "D", "D-", "F", "W", "Other"]
