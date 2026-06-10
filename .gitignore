@@ -34,6 +34,7 @@ pgdata/
 *.log
 .claude/settings.local.json
 .agents/
+.claude/
 
 # Python virtualenv and local DBs
 venv/
