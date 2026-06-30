@@ -95,6 +95,10 @@ async def cached(
     Exceptions raised by *compute_fn* always propagate. *compute_fn* must be
     side-effect-free: on cache-layer failure it may be invoked a second time.
     """
+    if cache is None and not settings.cache_enabled:
+        # No Redis configured (e.g. free single-service deploy) — skip the cache entirely.
+        return await compute_fn()
+
     backend = cache if cache is not None else get_cache()
     state: dict[str, Any] = {"value": _SENTINEL}
 

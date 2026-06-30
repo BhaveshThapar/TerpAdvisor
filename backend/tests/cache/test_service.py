@@ -96,6 +96,18 @@ class TestCachedHelper:
         with pytest.raises(ValueError):
             await cached("k4", boom, ttl=60, cache=cache)
 
+    @pytest.mark.asyncio
+    async def test_cache_disabled_computes_directly_without_backend(self, monkeypatch):
+        """With cache_enabled=False, no Redis is touched — compute runs directly."""
+        import app.cache.service as service
+
+        monkeypatch.setattr(service.settings, "cache_enabled", False)
+        compute, calls = _counting_compute("direct")
+
+        # No cache= passed: would normally build the Redis-backed singleton.
+        assert await cached("k5", compute, ttl=60) == "direct"
+        assert calls["n"] == 1
+
 
 class TestMakeKey:
     def test_deterministic_and_order_insensitive(self):

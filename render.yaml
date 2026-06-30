@@ -7,12 +7,13 @@ services:
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
-        sync: false   # set manually in Render dashboard
-      - key: REDIS_URL
-        sync: false   # set manually in Render dashboard
+        sync: false   # set to the Neon direct connection string in the Render dashboard
       - key: CORS_ORIGINS
         sync: false   # set to ["https://your-app.vercel.app"] in Render dashboard
       - key: DEMO_MODE
         value: "true"
+      - key: CACHE_ENABLED
+        value: "false"   # free single-service deploy: no Redis, cache computes directly
       - key: SECRET_KEY
         generateValue: true
+      # To run with Redis later, add REDIS_URL (sync: false) and set CACHE_ENABLED=true.
