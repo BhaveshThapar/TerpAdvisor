@@ -113,6 +113,9 @@ async def health_check():
     except Exception:
         health["status"] = "degraded"
         health["database"] = "unreachable"
+    if not settings.cache_enabled:
+        health["redis"] = "disabled"
+        return health
     try:
         import redis.asyncio as aioredis
         r = aioredis.from_url(settings.redis_url)

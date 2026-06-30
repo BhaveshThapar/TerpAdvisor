@@ -1,16 +1,37 @@
 from pydantic import model_validator
 from pydantic_settings import BaseSettings
+from sqlalchemy.engine.url import make_url
+
+# libpq-style SSL params understood by psycopg2 but rejected by asyncpg.
+# We strip them from the URLs and re-apply SSL via connect_args instead.
+_SSL_QUERY_KEYS = ["sslmode", "channel_binding", "ssl"]
 
 
 class Settings(BaseSettings):
     # Database
     database_url: str = "postgresql+asyncpg://terpadvisor:terpadvisor_dev@localhost:5432/terpadvisor"
     database_url_sync: str = ""
+    database_ssl: bool = False
 
     @model_validator(mode="after")
-    def _derive_sync_url(self) -> "Settings":
-        if not self.database_url_sync:
-            self.database_url_sync = self.database_url.replace("+asyncpg", "")
+    def _normalize_db_urls(self) -> "Settings":
+        # Accept a verbatim provider URL (e.g. Neon's "postgresql://...?sslmode=require")
+        # and turn it into driver-correct async/sync URLs with SSL handled in connect_args.
+        async_url = make_url(self.database_url)
+        ssl_in_url = any(k in async_url.query for k in _SSL_QUERY_KEYS)
+        async_url = async_url.difference_update_query(_SSL_QUERY_KEYS)
+        if async_url.drivername == "postgresql":
+            async_url = async_url.set(drivername="postgresql+asyncpg")
+        self.database_url = async_url.render_as_string(hide_password=False)
+
+        if self.database_url_sync:
+            sync_url = make_url(self.database_url_sync).difference_update_query(_SSL_QUERY_KEYS)
+        else:
+            sync_url = async_url.set(drivername=async_url.drivername.replace("+asyncpg", ""))
+        self.database_url_sync = sync_url.render_as_string(hide_password=False)
+
+        if ssl_in_url or (async_url.host or "").endswith("neon.tech"):
+            self.database_ssl = True
         return self
 
     # Demo mode — bypass auth for local development (must be explicitly enabled)
@@ -21,6 +42,8 @@ class Settings(BaseSettings):
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
+    # Set false to run without Redis — cache calls compute directly (fail-open by design).
+    cache_enabled: bool = True
 
     # Celery
     celery_broker_url: str = "redis://localhost:6379/1"
