@@ -19,6 +19,8 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "textblob>=0.18.0",
     "numpy>=1.26.0",
+    "pymupdf>=1.24.0",
+    "python-multipart>=0.0.9",
 ]
 
 [project.optional-dependencies]
