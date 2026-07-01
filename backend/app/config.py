@@ -42,7 +42,10 @@ class Settings(BaseSettings):
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
-    # Set false to run without Redis — cache calls compute directly (fail-open by design).
+    # Set false to run without Redis — the cache still uses its in-process LRU and
+    # Postgres layers (works on Neon), just skips the Redis layer + distributed lock.
+    redis_enabled: bool = True
+    # Set false to bypass caching entirely — cached() computes directly (fail-open).
     cache_enabled: bool = True
 
     # Celery

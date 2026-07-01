@@ -115,7 +115,7 @@ async def health_check():
     except Exception:
         health["status"] = "degraded"
         health["database"] = "unreachable"
-    if not settings.cache_enabled:
+    if not settings.redis_enabled:
         health["redis"] = "disabled"
         return health
     try:
