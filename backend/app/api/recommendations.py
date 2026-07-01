@@ -8,8 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.cache.service import cached, make_key
 from app.db.session import get_db
-from app.engine.course_graph import CourseGraph, CourseNode, PrereqNode, PrereqType
-from app.engine.degree_audit import DegreeAuditor, build_cs_requirements
+from app.engine.course_graph import CourseGraph
+from app.engine.degree_audit import DegreeAuditor
 from app.engine.requirements_loader import load_requirements_for_major
 from app.engine.planner import PlanGenerator
 from app.engine.recommender import RecommendationEngine
@@ -84,9 +84,11 @@ async def _get_completed_credits(
 async def _build_scoring_context(
     db: AsyncSession, available: list[str], completed: set[str], major: str,
     requirement_impact: dict[str, int], weight_overrides: dict | None,
+    course_rows: dict[str, dict],
     preference_tags: list[str] | None = None,
 ) -> ScoringContext:
-    """Build scoring context with real data from DB."""
+    """Build scoring context. `course_rows` is the already-loaded per-course data
+    (avg_gpa, gen_eds, precomputed review signals, ...) from the caller."""
     # Map professors to courses via sections so the professor scorer sees
     # real instructor data (previously hardcoded to [] — the scorer was a
     # no-op and the professor weight slider did nothing).
@@ -102,26 +104,17 @@ async def _build_scoring_context(
             course_profs.setdefault(sec_course_id, set()).add(prof_name)
             prof_names.add(prof_name)
 
-    # Fetch course data
+    # Build course_data from the preloaded rows — no second courses query.
     course_data = {}
-    if available:
-        result = await db.execute(select(Course).where(Course.course_id.in_(available)))
-        for c in result.scalars().all():
-            course_data[c.course_id] = {
-                "avg_gpa": c.avg_gpa,
-                "department": c.department,
-                "credits": c.credits,
-                "gen_eds": c.gen_eds or [],
-                "sections": [],
-                "professors": sorted(course_profs.get(c.course_id, set())),
-                # Precomputed review signals — let the sentiment/preference scorers
-                # skip reprocessing raw review text (see backfill_sentiment.py).
-                "review_count": c.review_count,
-                "sentiment_polarity": c.sentiment_polarity,
-                "sentiment_confidence": c.sentiment_confidence,
-                "sentiment_summary": c.sentiment_summary,
-                "review_tags": c.review_tags,
-            }
+    for course_id in available:
+        base = course_rows.get(course_id)
+        if base is None:
+            continue
+        course_data[course_id] = {
+            **base,
+            "sections": [],
+            "professors": sorted(course_profs.get(course_id, set())),
+        }
 
     # Fetch only professors who actually teach the candidate courses
     # (previously loaded the entire professors table on every request).
@@ -242,13 +235,20 @@ async def _compute_recommendations(body: RecommendationRequest, db: AsyncSession
     else:
         available = graph.get_available_courses(completed)
 
-    # Load course metadata for filtering
+    # Load each candidate course once, here, with everything the filters AND the
+    # scorers need. _build_scoring_context reuses this instead of re-querying the
+    # courses table (which it did once per scoring pass).
     if available:
         filter_result = await db.execute(select(Course).where(Course.course_id.in_(available)))
         course_meta = {
             c.course_id: {
                 "department": c.department, "credits": c.credits,
                 "avg_gpa": c.avg_gpa, "gen_eds": c.gen_eds or [],
+                "review_count": c.review_count,
+                "sentiment_polarity": c.sentiment_polarity,
+                "sentiment_confidence": c.sentiment_confidence,
+                "sentiment_summary": c.sentiment_summary,
+                "review_tags": c.review_tags,
             }
             for c in filter_result.scalars().all()
         }
@@ -323,7 +323,7 @@ async def _compute_recommendations(body: RecommendationRequest, db: AsyncSession
 
     context = await _build_scoring_context(
         db, available, completed, major, requirement_impact, weight_overrides,
-        preference_tags=preference_tags,
+        course_meta, preference_tags=preference_tags,
     )
 
     result = await _engine.recommend(available, context, body.top_n)
@@ -335,7 +335,7 @@ async def _compute_recommendations(body: RecommendationRequest, db: AsyncSession
             elective_weights["requirement"] = 0.0
             elective_context = await _build_scoring_context(
                 db, elective_ids, completed, major, requirement_impact,
-                elective_weights, preference_tags=preference_tags,
+                elective_weights, course_meta, preference_tags=preference_tags,
             )
             elective_result = await _engine.recommend(
                 elective_ids, elective_context, body.top_n,
