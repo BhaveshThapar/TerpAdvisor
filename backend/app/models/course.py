@@ -18,6 +18,14 @@ class Course(Base):
     )
     prerequisites_raw: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
+    # Precomputed review signals (populated by scripts/backfill_sentiment.py) so the
+    # recommendation pipeline doesn't reprocess raw review text on every request.
+    review_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sentiment_polarity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sentiment_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sentiment_summary: Mapped[str | None] = mapped_column(String, nullable=True)
+    review_tags: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
+
     reviews: Mapped[list["Review"]] = relationship(
         "Review", back_populates="course", cascade="all, delete-orphan"
     )

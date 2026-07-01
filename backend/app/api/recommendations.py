@@ -14,7 +14,7 @@ from app.engine.requirements_loader import load_requirements_for_major
 from app.engine.planner import PlanGenerator
 from app.engine.recommender import RecommendationEngine
 from app.engine.scorers.base import ScoringContext
-from app.models import Course, Professor, Review, Section
+from app.models import Course, Professor, Section
 from app.schemas.schemas import (
     AuditRequest,
     AuditResponse,
@@ -114,6 +114,13 @@ async def _build_scoring_context(
                 "gen_eds": c.gen_eds or [],
                 "sections": [],
                 "professors": sorted(course_profs.get(c.course_id, set())),
+                # Precomputed review signals — let the sentiment/preference scorers
+                # skip reprocessing raw review text (see backfill_sentiment.py).
+                "review_count": c.review_count,
+                "sentiment_polarity": c.sentiment_polarity,
+                "sentiment_confidence": c.sentiment_confidence,
+                "sentiment_summary": c.sentiment_summary,
+                "review_tags": c.review_tags,
             }
 
     # Fetch only professors who actually teach the candidate courses
@@ -128,17 +135,9 @@ async def _build_scoring_context(
                 "avg_rating": p.avg_rating, "review_count": p.review_count,
             }
 
-    # Fetch review data for available courses
-    review_data: dict[str, list] = {}
-    if available:
-        rev_result = await db.execute(
-            select(Review).where(Review.course_id.in_(available))
-        )
-        for r in rev_result.scalars().all():
-            review_data.setdefault(r.course_id, []).append(
-                {"rating": r.rating, "text": r.text or ""}
-            )
-
+    # Review text is not loaded here — the sentiment and preference-tag scorers
+    # read precomputed per-course signals from course_data instead (backfill_sentiment.py),
+    # which avoids pulling the entire reviews table into every request.
     return ScoringContext(
         user_id="current-user",
         completed_courses=completed,
@@ -146,7 +145,7 @@ async def _build_scoring_context(
         major=major,
         course_data=course_data,
         professor_data=professor_data,
-        review_data=review_data,
+        review_data={},
         grade_data={},
         requirement_impact=requirement_impact,
         selected_sections=[],
