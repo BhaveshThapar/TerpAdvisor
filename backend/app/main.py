@@ -102,7 +102,9 @@ app.include_router(professors.router)
 app.include_router(majors.router)
 
 
-@app.get("/api/health")
+# HEAD is allowed so uptime monitors that probe with HEAD (e.g. UptimeRobot's free
+# plan, which can't switch to GET) get a 200 instead of 405.
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check():
     from app.db.session import engine
     health = {"status": "healthy", "version": "0.1.0"}
