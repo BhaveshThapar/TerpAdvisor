@@ -38,7 +38,7 @@ def build_cache(redis_client=None, session_factory=None) -> StampedeProtectedCac
     instance (used by Celery workers, which need their own event loop and
     engine). With no arguments, uses the application defaults.
     """
-    if redis_client is None:
+    if redis_client is None and settings.redis_enabled:
         import redis.asyncio as aioredis
 
         redis_client = aioredis.from_url(settings.redis_url)
@@ -58,11 +58,14 @@ def get_cache() -> StampedeProtectedCache:
 
 
 def _build_default_multilayer() -> MultiLayerCache:
-    import redis.asyncio as aioredis
-
     from app.db.session import async_session
 
-    return MultiLayerCache(aioredis.from_url(settings.redis_url), async_session)
+    redis_client = None
+    if settings.redis_enabled:
+        import redis.asyncio as aioredis
+
+        redis_client = aioredis.from_url(settings.redis_url)
+    return MultiLayerCache(redis_client, async_session)
 
 
 def reset_cache_for_tests() -> None:

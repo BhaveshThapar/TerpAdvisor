@@ -1,4 +1,3 @@
-import json
 import logging
 import math
 import random
@@ -50,6 +49,26 @@ class StampedeProtectedCache:
     def __init__(self, cache: MultiLayerCache) -> None:
         self._cache = cache
 
+    async def _acquire_lock(self, lock_key: str) -> bool:
+        """Acquire the distributed recompute lock.
+
+        Without Redis (single-instance deploy) there is no distributed lock to
+        take, so we always "acquire" and let the caller compute.
+        """
+        if self._cache._redis is None:
+            return True
+        return bool(
+            await self._cache._redis.set(lock_key, "1", nx=True, ex=self.LOCK_TTL)
+        )
+
+    async def _release_lock(self, lock_key: str) -> None:
+        if self._cache._redis is None:
+            return
+        try:
+            await self._cache._redis.delete(lock_key)
+        except Exception:
+            logger.warning("Failed to release stampede lock for %s", lock_key, exc_info=True)
+
     async def get_or_compute(
         self,
         key: str,
@@ -89,9 +108,7 @@ class StampedeProtectedCache:
             # XFetch says this request should try to recompute early.
             # Acquire a distributed lock so only one worker does the work.
             lock_key = f"{self.LOCK_PREFIX}{key}"
-            acquired = await self._cache._redis.set(
-                lock_key, "1", nx=True, ex=self.LOCK_TTL
-            )
+            acquired = await self._acquire_lock(lock_key)
             if not acquired:
                 # Another worker is already recomputing; return stale value.
                 return value
@@ -101,9 +118,7 @@ class StampedeProtectedCache:
             # Cache miss -- we *must* compute.  Grab the lock to prevent
             # thundering-herd on a cold key.
             lock_key = f"{self.LOCK_PREFIX}{key}"
-            acquired = await self._cache._redis.set(
-                lock_key, "1", nx=True, ex=self.LOCK_TTL
-            )
+            acquired = await self._acquire_lock(lock_key)
             if not acquired and envelope is not None:
                 # Somebody else is computing; return whatever stale data we had.
                 if isinstance(envelope, dict) and "v" in envelope:
@@ -126,8 +141,4 @@ class StampedeProtectedCache:
             return value
         finally:
             # Always release the lock.
-            lock_key = f"{self.LOCK_PREFIX}{key}"
-            try:
-                await self._cache._redis.delete(lock_key)
-            except Exception:
-                logger.warning("Failed to release stampede lock for %s", key, exc_info=True)
+            await self._release_lock(f"{self.LOCK_PREFIX}{key}")

@@ -4,8 +4,11 @@ Uses in-memory stubs for MultiLayerCache and the Redis lock so no external
 services are required (consistent with the rest of the suite).
 """
 
+import json
+
 import pytest
 
+from app.cache.multi_layer import MultiLayerCache
 from app.cache.service import cached, make_key
 from app.cache.stampede import StampedeProtectedCache
 
@@ -97,6 +100,21 @@ class TestCachedHelper:
             await cached("k4", boom, ttl=60, cache=cache)
 
     @pytest.mark.asyncio
+    async def test_no_redis_still_caches_via_lru_pg(self):
+        """With no Redis (redis=None) the stampede lock no-ops and caching works."""
+        stub = _StubMultiLayer()
+        stub._redis = None
+        cache = StampedeProtectedCache(stub)
+        compute, calls = _counting_compute("value")
+
+        first = await cached("nr1", compute, ttl=60, cache=cache)
+        second = await cached("nr1", compute, ttl=60, cache=cache)
+
+        assert first == "value"
+        assert second == "value"
+        assert calls["n"] == 1  # second call served from cache, lock skipped
+
+    @pytest.mark.asyncio
     async def test_cache_disabled_computes_directly_without_backend(self, monkeypatch):
         """With cache_enabled=False, no Redis is touched — compute runs directly."""
         import app.cache.service as service
@@ -107,6 +125,30 @@ class TestCachedHelper:
         # No cache= passed: would normally build the Redis-backed singleton.
         assert await cached("k5", compute, ttl=60) == "direct"
         assert calls["n"] == 1
+
+
+class TestMultiLayerWithoutRedis:
+    @pytest.mark.asyncio
+    async def test_lru_and_pg_only_when_redis_is_none(self, monkeypatch):
+        """redis=None routes get/set through the LRU and Postgres layers only."""
+        mlc = MultiLayerCache(None, db_session_factory=None)
+        pg: dict[str, str] = {}
+
+        async def fake_pg_get(key):
+            raw = pg.get(key)
+            return (json.loads(raw), 100) if raw is not None else (None, 0)
+
+        async def fake_pg_set(key, serialized, ttl):
+            pg[key] = serialized
+
+        monkeypatch.setattr(mlc, "_pg_get", fake_pg_get)
+        monkeypatch.setattr(mlc, "_pg_set", fake_pg_set)
+
+        await mlc.set("k", {"a": 1}, ttl=100)
+        assert pg["k"] == json.dumps({"a": 1})  # persisted to Postgres, no Redis needed
+
+        mlc._lru.clear()  # force the Postgres read path
+        assert await mlc.get("k") == {"a": 1}
 
 
 class TestMakeKey:

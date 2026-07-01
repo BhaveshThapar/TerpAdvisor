@@ -12,8 +12,8 @@ services:
         sync: false   # set to ["https://your-app.vercel.app"] in Render dashboard
       - key: DEMO_MODE
         value: "true"
-      - key: CACHE_ENABLED
-        value: "false"   # free single-service deploy: no Redis, cache computes directly
+      - key: REDIS_ENABLED
+        value: "false"   # no Redis: cache still uses in-process LRU + Postgres (Neon)
       - key: SECRET_KEY
         generateValue: true
-      # To run with Redis later, add REDIS_URL (sync: false) and set CACHE_ENABLED=true.
+      # To add Redis later, set REDIS_URL (sync: false) and REDIS_ENABLED=true.

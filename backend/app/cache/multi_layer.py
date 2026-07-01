@@ -94,10 +94,11 @@ class MultiLayerCache:
 
     def __init__(
         self,
-        redis_client: Redis,
+        redis_client: Redis | None,
         db_session_factory: async_sessionmaker[AsyncSession],
         lru_maxsize: int = 1000,
     ) -> None:
+        # redis_client may be None — the cache then runs as LRU -> Postgres only.
         self._redis = redis_client
         self._db_session_factory = db_session_factory
         self._lru = TTLLRUCache(maxsize=lru_maxsize)
@@ -115,20 +116,22 @@ class MultiLayerCache:
             logger.debug("Cache HIT (LRU): %s", key)
             return value
 
-        # Layer 2 - Redis
-        raw = await self._redis.get(key)
-        if raw is not None:
-            ttl = await self._redis.ttl(key)
-            ttl = max(ttl, 60)  # guard against -1 / -2
-            value = json.loads(raw)
-            self._lru.set(key, value, ttl)
-            logger.debug("Cache HIT (Redis): %s", key)
-            return value
+        # Layer 2 - Redis (skipped when Redis is not configured)
+        if self._redis is not None:
+            raw = await self._redis.get(key)
+            if raw is not None:
+                ttl = await self._redis.ttl(key)
+                ttl = max(ttl, 60)  # guard against -1 / -2
+                value = json.loads(raw)
+                self._lru.set(key, value, ttl)
+                logger.debug("Cache HIT (Redis): %s", key)
+                return value
 
         # Layer 3 - PostgreSQL
         value, ttl = await self._pg_get(key)
         if value is not None:
-            await self._promote_to_redis(key, value, ttl)
+            if self._redis is not None:
+                await self._promote_to_redis(key, value, ttl)
             self._lru.set(key, value, ttl)
             logger.debug("Cache HIT (Postgres): %s", key)
             return value
@@ -143,8 +146,9 @@ class MultiLayerCache:
         # Layer 1
         self._lru.set(key, value, ttl)
 
-        # Layer 2
-        await self._redis.set(key, serialized, ex=ttl)
+        # Layer 2 (skipped when Redis is not configured)
+        if self._redis is not None:
+            await self._redis.set(key, serialized, ex=ttl)
 
         # Layer 3
         await self._pg_set(key, serialized, ttl)
@@ -152,7 +156,8 @@ class MultiLayerCache:
     async def invalidate(self, key: str) -> None:
         """Remove *key* from every layer."""
         self._lru.delete(key)
-        await self._redis.delete(key)
+        if self._redis is not None:
+            await self._redis.delete(key)
         await self._pg_delete(key)
 
     async def invalidate_pattern(self, pattern: str) -> None:
@@ -164,16 +169,17 @@ class MultiLayerCache:
         # LRU
         self._lru.delete_pattern(pattern)
 
-        # Redis - iterate with SCAN to stay non-blocking
-        cursor: int = 0
-        while True:
-            cursor, keys = await self._redis.scan(
-                cursor=cursor, match=pattern, count=200
-            )
-            if keys:
-                await self._redis.delete(*keys)
-            if cursor == 0:
-                break
+        # Redis - iterate with SCAN to stay non-blocking (skipped when unconfigured)
+        if self._redis is not None:
+            cursor: int = 0
+            while True:
+                cursor, keys = await self._redis.scan(
+                    cursor=cursor, match=pattern, count=200
+                )
+                if keys:
+                    await self._redis.delete(*keys)
+                if cursor == 0:
+                    break
 
         # PostgreSQL - use LIKE (translate glob '*' to SQL '%')
         sql_pattern = pattern.replace("*", "%")
