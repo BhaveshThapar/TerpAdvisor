@@ -27,6 +27,20 @@ TAG_KEYWORDS: dict[str, list[str]] = {
 }
 
 
+def match_review_tags(combined_text: str) -> set[str]:
+    """Return every preference tag whose keywords appear in the review text.
+
+    Shared by the live fallback and scripts/backfill_sentiment.py so precomputed
+    and on-the-fly tag matching stay identical.
+    """
+    text = combined_text.lower()
+    return {
+        tag
+        for tag, keywords in TAG_KEYWORDS.items()
+        if any(kw in text for kw in keywords)
+    }
+
+
 class PreferenceTagScorer(BaseScorer):
     name = "preference_tags"
     display_name = "Preference Match"
@@ -42,6 +56,22 @@ class PreferenceTagScorer(BaseScorer):
                 factor_name=self.name,
             )
 
+        # Fast path: use precomputed per-course tags (backfill_sentiment.py) so we
+        # don't rescan raw review text on every request.
+        cd = context.course_data.get(course_id, {})
+        precomputed = cd.get("review_tags")
+        if precomputed is not None:
+            review_count = cd.get("review_count") or 0
+            if review_count == 0:
+                return ScoreResult(
+                    score=0.5,
+                    explanation="No review data to match preferences against",
+                    confidence=0.1,
+                    factor_name=self.name,
+                )
+            return self._score_from_tags(user_tags, set(precomputed), review_count)
+
+        # Fallback: match live against raw review text.
         reviews = context.review_data.get(course_id, [])
         if not reviews:
             return ScoreResult(
@@ -51,28 +81,24 @@ class PreferenceTagScorer(BaseScorer):
                 factor_name=self.name,
             )
 
-        # Combine all review text
-        combined_text = " ".join(r.get("text", "") for r in reviews).lower()
+        course_tags = match_review_tags(" ".join(r.get("text", "") for r in reviews))
+        return self._score_from_tags(user_tags, course_tags, len(reviews))
 
-        matched_tags = []
-        for tag in user_tags:
-            keywords = TAG_KEYWORDS.get(tag, [])
-            if any(kw in combined_text for kw in keywords):
-                matched_tags.append(tag)
-
-        if not matched_tags:
+    def _score_from_tags(
+        self, user_tags: list[str], course_tags: set[str], review_count: int
+    ) -> ScoreResult:
+        matched = [t for t in user_tags if t in course_tags]
+        if not matched:
             return ScoreResult(
                 score=0.3,
                 explanation=f"Reviews don't mention your preferences: {', '.join(user_tags[:3])}",
                 confidence=0.4,
                 factor_name=self.name,
             )
-
-        match_ratio = len(matched_tags) / len(user_tags)
-        tag_list = ", ".join(matched_tags[:3])
+        match_ratio = len(matched) / len(user_tags)
         return ScoreResult(
             score=min(1.0, 0.5 + match_ratio * 0.5),
-            explanation=f"Matches your preferences: {tag_list}",
-            confidence=min(1.0, len(reviews) / 5),
+            explanation=f"Matches your preferences: {', '.join(matched[:3])}",
+            confidence=min(1.0, review_count / 5),
             factor_name=self.name,
         )

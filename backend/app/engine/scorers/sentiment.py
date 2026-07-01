@@ -10,6 +10,27 @@ class SentimentScorer(BaseScorer):
     default_weight = 0.10
 
     async def score(self, course_id: str, context: ScoringContext) -> ScoreResult:
+        # Fast path: use precomputed per-course sentiment (backfill_sentiment.py)
+        # so we don't re-run NLP over raw review text on every request.
+        cd = context.course_data.get(course_id, {})
+        polarity = cd.get("sentiment_polarity")
+        if polarity is not None:
+            confidence = cd.get("sentiment_confidence") or 0.0
+            if confidence <= 0.0:
+                return ScoreResult(
+                    score=0.5,
+                    explanation="No student reviews available",
+                    confidence=0.1,
+                    factor_name=self.name,
+                )
+            return ScoreResult(
+                score=(polarity + 1.0) / 2.0,
+                explanation=cd.get("sentiment_summary") or "Student review sentiment",
+                confidence=confidence,
+                factor_name=self.name,
+            )
+
+        # Fallback: compute live from raw reviews (tests, un-backfilled rows).
         reviews = context.review_data.get(course_id, [])
 
         if not reviews:
