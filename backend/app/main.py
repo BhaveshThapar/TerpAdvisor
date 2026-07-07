@@ -69,7 +69,9 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_credentials=True,
+    # The app is credential-less (no cookies/auth — user state lives in localStorage),
+    # so credentialed CORS is unnecessary and would only widen a future misconfig.
+    allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )

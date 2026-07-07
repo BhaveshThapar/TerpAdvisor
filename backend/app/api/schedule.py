@@ -1,6 +1,7 @@
 """Schedule builder API endpoints."""
 
-from datetime import date, datetime, timedelta
+import re
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import PlainTextResponse
@@ -16,7 +17,7 @@ from app.engine.schedule_solver import (
     ScheduleSolver,
     Section as EngineSection,
 )
-from app.models import Professor, Section
+from app.models import Section
 from app.schemas.schemas import (
     ScheduleListResponse,
     ScheduleMeetingResponse,
@@ -29,6 +30,32 @@ router = APIRouter(prefix="/api/schedule", tags=["schedule"])
 
 # Day character mapping: DB stores "MWF" or "TuTh", engine needs individual day strings
 DAY_CHARS = {"M": "M", "T": "T", "W": "W", "R": "Th", "F": "F"}
+
+_HHMM_RE = re.compile(r"^([01]?\d|2[0-3]):([0-5]\d)$")
+
+
+def _parse_hhmm(value: str, field_name: str) -> int:
+    """Parse a 'HH:MM' 24-hour string into minutes from midnight, or 400 on bad input."""
+    m = _HHMM_RE.match(value.strip())
+    if not m:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid {field_name} time '{value}'; expected HH:MM (24-hour).",
+        )
+    return int(m.group(1)) * 60 + int(m.group(2))
+
+
+def _ical_escape(value: str) -> str:
+    """Escape a text value for an iCal property per RFC 5545 (backslash, comma,
+    semicolon, and newlines) so DB-sourced names can't inject calendar syntax."""
+    return (
+        value.replace("\\", "\\\\")
+        .replace(";", "\\;")
+        .replace(",", "\\,")
+        .replace("\r\n", "\\n")
+        .replace("\n", "\\n")
+        .replace("\r", "\\n")
+    )
 
 
 def _parse_days(days_str: str | None) -> list[str]:
@@ -89,12 +116,15 @@ async def generate_schedules(request: ScheduleRequest, db: AsyncSession = Depend
     if request.preferences:
         p = request.preferences
         if p.no_before:
-            h, m = p.no_before.split(":")
-            prefs.no_before = int(h) * 60 + int(m)
+            prefs.no_before = _parse_hhmm(p.no_before, "no_before")
         if p.no_after:
-            h, m = p.no_after.split(":")
-            prefs.no_after = int(h) * 60 + int(m)
-        prefs.day_preference = DayPreference(p.day_preference)
+            prefs.no_after = _parse_hhmm(p.no_after, "no_after")
+        try:
+            prefs.day_preference = DayPreference(p.day_preference)
+        except ValueError:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid day_preference '{p.day_preference}'."
+            )
         prefs.max_classes_per_day = p.max_classes_per_day
         prefs.minimize_gaps = p.minimize_gaps
         prefs.avoid_days = p.avoid_days or []
@@ -230,9 +260,9 @@ async def export_schedule_ical(request: ScheduleRequest, db: AsyncSession = Depe
                 f"DTSTART:{dtstart}",
                 f"DTEND:{dtend}",
                 f"RRULE:FREQ=WEEKLY;BYDAY={ical_day};UNTIL={until}",
-                f"SUMMARY:{section.course_id} - {section.professor}",
-                f"DESCRIPTION:Section {section.section_id}",
-                f"LOCATION:UMD Campus",
+                f"SUMMARY:{_ical_escape(section.course_id)} - {_ical_escape(section.professor)}",
+                f"DESCRIPTION:Section {_ical_escape(section.section_id)}",
+                "LOCATION:UMD Campus",
                 "END:VEVENT",
             ])
 

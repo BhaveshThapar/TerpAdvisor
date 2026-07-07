@@ -79,7 +79,7 @@ class ReviewResponse(BaseModel):
 # ── Recommendations ───────────────────────────
 
 class RecommendationRequest(BaseModel):
-    completed_courses: list[str] = []  # course IDs the student has completed
+    completed_courses: list[str] = Field(default_factory=list, max_length=300)  # course IDs completed
     major: str = "Computer Science"
     track: str = "General"
     weight_overrides: dict[str, float] | None = None
@@ -87,7 +87,7 @@ class RecommendationRequest(BaseModel):
     preference_tags: list[str] | None = None  # e.g., ["project-based", "no-final-exam"]
     goal: Literal["balanced", "easiest"] = "balanced"
     show_prerequisites_only: bool = False
-    top_n: int = 20
+    top_n: int = Field(20, ge=1, le=100)
 
 
 class RecommendationFilters(BaseModel):
@@ -150,8 +150,8 @@ class GroupResultResponse(BaseModel):
 
 
 class AuditRequest(BaseModel):
-    completed_courses: list[str] = []       # course IDs the student has completed
-    in_progress_courses: list[str] = []     # course IDs currently being taken
+    completed_courses: list[str] = Field(default_factory=list, max_length=300)   # completed course IDs
+    in_progress_courses: list[str] = Field(default_factory=list, max_length=50)  # currently being taken
     major: str = "Computer Science"
     track: str = "General"                  # major specialization track
     minor_prefix: str | None = None         # department prefix for minor (e.g. "ENTR" for Entrepreneurship)
@@ -173,9 +173,9 @@ class AuditResponse(BaseModel):
 # ── Schedule ──────────────────────────────────
 
 class ScheduleRequest(BaseModel):
-    course_ids: list[str]
+    course_ids: list[str] = Field(default_factory=list, max_length=50)
     preferences: SchedulePreferencesSchema | None = None
-    max_results: int = 5
+    max_results: int = Field(5, ge=1, le=25)
 
 
 class SchedulePreferencesSchema(BaseModel):
@@ -217,11 +217,11 @@ class ScheduleListResponse(BaseModel):
 # ── Semester Plan ─────────────────────────────
 
 class PlanRequest(BaseModel):
-    completed_courses: list[str] = []  # course IDs the student has completed
+    completed_courses: list[str] = Field(default_factory=list, max_length=300)  # course IDs completed
     major: str = "Computer Science"
     track: str = "General"
-    max_credits_per_semester: int = 16
-    max_courses_per_semester: int = 5
+    max_credits_per_semester: int = Field(16, ge=1, le=30)
+    max_courses_per_semester: int = Field(5, ge=1, le=10)
     start_semester: str = "Fall 2026"
     prioritize: list[str] | None = None
 

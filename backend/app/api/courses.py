@@ -1,5 +1,6 @@
 """Course and search API endpoints."""
 
+import logging
 import re
 
 import httpx
@@ -13,6 +14,8 @@ from app.db.session import get_db
 from app.engine.requirements_loader import load_requirements_for_major
 from app.models import Course, Professor, Review
 from app.schemas.schemas import CourseResponse
+
+logger = logging.getLogger("terpadvisor")
 
 router = APIRouter(prefix="/api/courses", tags=["courses"])
 
@@ -89,9 +92,9 @@ async def _fetch_planetterp_course(course_id: str) -> dict | None:
 
 @router.get("/search", response_model=list[CourseResponse])
 async def search_courses(
-    q: str = Query(..., min_length=2),
+    q: str = Query(..., min_length=2, max_length=100),
     department: str | None = None,
-    limit: int = Query(20, le=50),
+    limit: int = Query(20, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
 ):
     """Search courses by name or ID."""
@@ -169,6 +172,7 @@ async def get_course_detail(
     # Parse prerequisites — try DB first, fall back to umd.io
     prereqs: list[str] = []
     prereq_text: str = ""
+    fetched_description: str | None = None
     if course.prerequisites_raw:
         raw = course.prerequisites_raw
         if isinstance(raw, list):
@@ -190,13 +194,10 @@ async def get_course_detail(
             prereq_text = raw_text.strip()
             if prereq_text:
                 prereqs = _UMD_COURSE_ID_RE.findall(prereq_text)
-                # Persist so we don't fetch again next time
-                course.prerequisites_raw = {"text": prereq_text, "courses": prereqs}
-                await db.commit()
-            # Also backfill description if missing
+            # Use the freshly fetched description for display only. A GET must be
+            # side-effect-free — persistence happens via the ETL / POST …/sync, not here.
             if not course.description and umdio.get("description"):
-                course.description = umdio["description"]
-                await db.commit()
+                fetched_description = umdio["description"]
 
     # Fall back to PlanetTerp for professor list if sections gave us nothing
     if not professors:
@@ -270,7 +271,7 @@ async def get_course_detail(
         "name": course.name,
         "department": course.department,
         "credits": course.credits,
-        "description": course.description or "",
+        "description": course.description or fetched_description or "",
         "avg_gpa": course.avg_gpa,
         "gen_eds": course.gen_eds or [],
         "grade_distribution": grade_dist,
@@ -296,8 +297,9 @@ async def sync_course_professors(course_id: str, db: AsyncSession = Depends(get_
         etl = PlanetTerpETL()
         result = await loop.run_in_executor(None, etl.sync_course, course_id.upper())
         return {"success": True, "course_id": course_id.upper(), "detail": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    except Exception:
+        logger.exception("Failed to sync course %s", course_id)
+        raise HTTPException(status_code=500, detail="Failed to sync course data")
 
 
 @router.get("/{course_id}/grades")
@@ -315,7 +317,7 @@ async def get_grade_distribution(course_id: str, db: AsyncSession = Depends(get_
 @router.get("/{course_id}/reviews")
 async def get_reviews(
     course_id: str,
-    limit: int = Query(10, le=50),
+    limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db),
 ):
     result = await db.execute(
@@ -333,12 +335,16 @@ async def get_reviews(
 
 # ── Transcript Parsing ────────────────────────
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from fastapi import File, UploadFile
+
+# Reject transcripts larger than this to bound parser CPU/memory on a public endpoint.
+_MAX_TRANSCRIPT_CHARS = 200_000
+_MAX_PDF_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
 class TranscriptParseRequest(BaseModel):
-    raw_text: str
+    raw_text: str = Field(..., max_length=_MAX_TRANSCRIPT_CHARS)
 
 
 class ParsedCourse(BaseModel):
@@ -736,10 +742,14 @@ async def parse_transcript_pdf(
     Supports Testudo unofficial transcripts and similar formats.
     """
     if not file.filename or not file.filename.lower().endswith(".pdf"):
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="Only PDF files are accepted")
 
     contents = await file.read()
+    if len(contents) > _MAX_PDF_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"PDF too large (max {_MAX_PDF_BYTES // (1024 * 1024)} MB)",
+        )
 
     try:
         import fitz  # pymupdf
@@ -750,11 +760,11 @@ async def parse_transcript_pdf(
             text_parts.append(page.get_text())
         doc.close()
         raw_text = "\n".join(text_parts)
-    except Exception as e:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=400, detail=f"Failed to read PDF: {str(e)}")
+    except Exception:
+        logger.warning("Failed to read uploaded PDF", exc_info=True)
+        raise HTTPException(status_code=400, detail="Could not read the uploaded PDF file")
 
     if not raw_text.strip():
-        return TranscriptParseResult(matched=[], suggested=[], unrecognized=[])
+        return TranscriptParseResult(courses=[], total_credits=0, major=None)
 
-    return await _match_courses(raw_text, db)
+    return await _match_courses(raw_text[:_MAX_TRANSCRIPT_CHARS], db)
