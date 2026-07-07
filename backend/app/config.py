@@ -34,9 +34,6 @@ class Settings(BaseSettings):
             self.database_ssl = True
         return self
 
-    # Demo mode — bypass auth for local development (must be explicitly enabled)
-    demo_mode: bool = False
-
     # CORS
     cors_origins: list[str] = ["http://localhost:3000"]
 
@@ -71,12 +68,14 @@ class Settings(BaseSettings):
     cache_ttl_recommendations: int = 3600  # 1 hour
     lru_cache_maxsize: int = 1000
 
-    # Auth
-    secret_key: str = "dev-secret-key-change-in-production"
-    google_client_id: str = ""
-    google_client_secret: str = ""
-
-    model_config = {"env_prefix": "", "case_sensitive": False, "env_file": ".env"}
+    model_config = {
+        "env_prefix": "",
+        "case_sensitive": False,
+        "env_file": ".env",
+        # Ignore unrelated env vars / .env keys (e.g. Render's generated SECRET_KEY)
+        # so they can't break startup now that auth settings are gone.
+        "extra": "ignore",
+    }
 
 
 settings = Settings()

@@ -10,10 +10,6 @@ services:
         sync: false   # set to the Neon direct connection string in the Render dashboard
       - key: CORS_ORIGINS
         sync: false   # set to ["https://your-app.vercel.app"] in Render dashboard
-      - key: DEMO_MODE
-        value: "true"
       - key: REDIS_ENABLED
         value: "false"   # no Redis: cache still uses in-process LRU + Postgres (Neon)
-      - key: SECRET_KEY
-        generateValue: true
       # To add Redis later, set REDIS_URL (sync: false) and REDIS_ENABLED=true.
