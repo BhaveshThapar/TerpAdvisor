@@ -1,5 +1,7 @@
 """Professor search and detail API endpoints."""
 
+import logging
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
@@ -10,6 +12,8 @@ from app.models import Professor, Review
 from app.schemas.schemas import ProfessorDetailResponse, ProfessorResponse, ReviewResponse
 
 router = APIRouter(prefix="/api/professors", tags=["professors"])
+
+logger = logging.getLogger("terpadvisor")
 
 PLANETTERP_BASE = "https://planetterp.com/api/v1"
 
@@ -60,33 +64,36 @@ async def get_professor(
         prof = result.scalar_one_or_none()
 
     if not prof:
-        # If still not found, try to fetch from PlanetTerp live
+        # Not in our DB — fetch live from PlanetTerp for display only. A GET must be
+        # side-effect-free; persist via POST /api/professors/{slug}/sync instead.
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
                 resp = await client.get(
                     f"{PLANETTERP_BASE}/professor",
                     params={"name": name_guess, "reviews": "true"},
                 )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    import asyncio
-                    from app.workers.etl.planetterp_etl import PlanetTerpETL
-                    
-                    loop = asyncio.get_event_loop()
-                    def _force_sync():
-                        from app.db.session import SyncSession
-                        with SyncSession() as session:
-                            etl = PlanetTerpETL()
-                            p = etl._sync_professor(session, data["name"])
-                            session.commit()
-                            return p.id
-                    
-                    prof_id = await loop.run_in_executor(None, _force_sync)
-                    # Re-fetch professor object
-                    result = await db.execute(select(Professor).where(Professor.id == prof_id))
-                    prof = result.scalar_one_or_none()
+            if resp.status_code == 200:
+                data = resp.json()
+                live_reviews = data.get("reviews", []) or []
+                return ProfessorDetailResponse(
+                    name=data.get("name") or name_guess,
+                    slug=slug,
+                    avg_rating=data.get("average_rating"),
+                    review_count=len(live_reviews),
+                    courses_taught=data.get("courses", []) or [],
+                    reviews=[
+                        ReviewResponse(
+                            rating=int(r["rating"]) if r.get("rating") is not None else None,
+                            text=r.get("review") or "",
+                            professor=data.get("name") or name_guess,
+                            created_at=r.get("created"),
+                        )
+                        for r in live_reviews
+                        if r.get("rating") is not None or r.get("review")
+                    ],
+                )
         except Exception:
-            pass
+            logger.warning("Live professor fetch failed for %s", slug, exc_info=True)
 
     if not prof:
         raise HTTPException(status_code=404, detail=f"Professor '{slug}' not found")
@@ -105,8 +112,11 @@ async def get_professor(
     )
     db_review_count = count_result.scalar() or 0
 
-    # If DB has no linked review text, fetch live from PlanetTerp
+    # If DB has no linked review text, fetch live from PlanetTerp for display only
+    # (no persistence — a GET must stay side-effect-free).
     live_reviews: list[dict] = []
+    live_review_count: int | None = None
+    live_avg_rating: float | None = None
     if not db_reviews:
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
@@ -114,24 +124,20 @@ async def get_professor(
                     f"{PLANETTERP_BASE}/professor",
                     params={"name": prof.name, "reviews": "true"},
                 )
-                if resp.status_code == 200:
-                    data = resp.json()
-                    live_reviews = data.get("reviews", []) or []
-                    # Also refresh stored stats from live data
-                    live_count = len(live_reviews)
-                    live_rating = data.get("average_rating")
-                    if live_count > 0 and live_count != prof.review_count:
-                        prof.review_count = live_count
-                        if live_rating:
-                            prof.avg_rating = live_rating
-                        await db.commit()
+            if resp.status_code == 200:
+                data = resp.json()
+                live_reviews = data.get("reviews", []) or []
+                live_review_count = len(live_reviews)
+                live_avg_rating = data.get("average_rating")
         except Exception:
-            pass
+            logger.warning("Live professor review fetch failed for %s", prof.slug, exc_info=True)
 
-    review_count = db_review_count if db_review_count > 0 else prof.review_count
+    review_count = db_review_count if db_review_count > 0 else (live_review_count or prof.review_count)
 
-    # Compute avg_rating from local reviews if stored value is missing
+    # Compute avg_rating: stored value → live value → average of local reviews.
     avg_rating = prof.avg_rating
+    if avg_rating is None:
+        avg_rating = live_avg_rating
     if avg_rating is None and db_reviews:
         rated = [r.rating for r in db_reviews if r.rating is not None]
         if rated:
